@@ -69,6 +69,23 @@ CREATE TABLE IF NOT EXISTS session_flags (
   resolved_at TIMESTAMP,
   resolved_by_session TEXT
 );
+
+CREATE TABLE IF NOT EXISTS hook_event_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tool_name TEXT NOT NULL,
+  command TEXT,
+  file_path TEXT,
+  session_id TEXT,
+  session_cwd TEXT,
+  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS dismissed_suggestions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  suggestion_key TEXT UNIQUE NOT NULL,
+  dismissed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  hit_count_at_dismissal INTEGER
+);
 `;
 
 const MIGRATIONS = [
