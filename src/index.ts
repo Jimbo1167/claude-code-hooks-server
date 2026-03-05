@@ -6,6 +6,8 @@ import cors from 'cors';
 import path from 'path';
 import hooksRouter from './routes/hooks';
 import apiRouter from './routes/api';
+import rulesRouter from './routes/rules';
+import flagsRouter from './routes/flags';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3003', 10);
@@ -15,6 +17,8 @@ app.use(express.json());
 
 app.use('/hooks', hooksRouter);
 app.use('/api', apiRouter);
+app.use('/api', rulesRouter);
+app.use('/api', flagsRouter);
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/', (_req, res) => {
