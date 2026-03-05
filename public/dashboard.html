@@ -392,6 +392,77 @@
     }
     .toggle-switch input:checked + .toggle-slider { background: #3fb950; }
     .toggle-switch input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+    /* Suggestions */
+    .suggestions-section { margin-bottom: 20px; }
+    .suggestions-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .suggestions-header h2 { margin-bottom: 0; }
+    .count-badge {
+      background: #c9a0ff30;
+      color: #c9a0ff;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .suggestion-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .suggestion-card:hover { border-color: #484f58; }
+    .suggestion-info { flex: 1; }
+    .suggestion-desc {
+      font-size: 0.85rem;
+      color: #e1e4e8;
+    }
+    .suggestion-desc code {
+      background: #30363d;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 0.8rem;
+    }
+    .suggestion-meta {
+      font-size: 0.75rem;
+      color: #8b949e;
+      margin-top: 4px;
+    }
+    .suggestion-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .btn-success {
+      background: #3fb950;
+      color: #0f1117;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-success:hover { background: #56d364; }
+    .btn-ghost {
+      background: transparent;
+      color: #8b949e;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .btn-ghost:hover { background: #21262d; color: #e1e4e8; }
   </style>
 </head>
 <body>
@@ -446,6 +517,14 @@
     </div>
 
     <div id="tab-rules" style="display:none">
+      <div id="suggestions-section" class="suggestions-section" style="display:none;">
+        <div class="suggestions-header">
+          <h2>Suggested Rules</h2>
+          <span class="count-badge" id="suggestions-count">0</span>
+        </div>
+        <div id="suggestions-list"></div>
+      </div>
+
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h2 style="margin-bottom:0;">Permission Rules</h2>
         <button class="btn-primary" onclick="showRuleForm()">Add Rule</button>
@@ -587,7 +666,7 @@
       document.getElementById('tab-rules').style.display = tab === 'rules' ? 'block' : 'none';
       document.getElementById('tab-flags').style.display = tab === 'flags' ? 'block' : 'none';
 
-      if (tab === 'rules') { loadRules(); loadAuditLog(); }
+      if (tab === 'rules') { loadSuggestions(); loadRules(); loadAuditLog(); }
       if (tab === 'flags') { loadFlags(); }
     }
 
@@ -921,6 +1000,70 @@
           <td style="font-size:0.78rem;color:#8b949e;">${escapeHtml(e.reason || '-')}</td>
         </tr>
       `).join('');
+    }
+
+    // Suggestions
+    let suggestionsCache = [];
+
+    async function loadSuggestions() {
+      try {
+        const res = await fetch('/api/rules/suggestions');
+        suggestionsCache = await res.json();
+        const section = document.getElementById('suggestions-section');
+        const container = document.getElementById('suggestions-list');
+        const countBadge = document.getElementById('suggestions-count');
+
+        if (suggestionsCache.length === 0) {
+          section.style.display = 'none';
+          return;
+        }
+
+        section.style.display = 'block';
+        countBadge.textContent = suggestionsCache.length;
+
+        container.innerHTML = suggestionsCache.map((s, i) => `
+          <div class="suggestion-card">
+            <div class="suggestion-info">
+              <div class="suggestion-desc">${escapeHtml(s.description)}</div>
+              <div class="suggestion-meta">
+                <span class="decision-badge decision-${s.proposed_rule.decision}">${s.proposed_rule.decision}</span>
+                ${s.proposed_rule.tool_name_pattern ? ' &middot; tool: <code>' + escapeHtml(s.proposed_rule.tool_name_pattern) + '</code>' : ''}
+                ${s.proposed_rule.command_pattern ? ' &middot; cmd: <code>' + escapeHtml(s.proposed_rule.command_pattern) + '</code>' : ''}
+                ${s.proposed_rule.file_path_pattern ? ' &middot; path: <code>' + escapeHtml(s.proposed_rule.file_path_pattern) + '</code>' : ''}
+              </div>
+            </div>
+            <div class="suggestion-actions">
+              <button class="btn-success" onclick="addSuggestion(${i})">Add Rule</button>
+              <button class="btn-ghost" onclick="dismissSuggestionAt(${i})">Dismiss</button>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error('Failed to load suggestions:', e);
+      }
+    }
+
+    async function addSuggestion(index) {
+      const s = suggestionsCache[index];
+      if (!s) return;
+      await fetch('/api/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(s.proposed_rule),
+      });
+      loadSuggestions();
+      loadRules();
+    }
+
+    async function dismissSuggestionAt(index) {
+      const s = suggestionsCache[index];
+      if (!s) return;
+      await fetch(`/api/rules/suggestions/${encodeURIComponent(s.key)}/dismiss`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hit_count: s.hit_count }),
+      });
+      loadSuggestions();
     }
 
     // Flags
