@@ -25,6 +25,50 @@ CREATE TABLE IF NOT EXISTS hook_events (
   last_assistant_message TEXT,
   FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
+
+CREATE TABLE IF NOT EXISTS permission_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT,
+  enabled INTEGER DEFAULT 1,
+  priority INTEGER DEFAULT 0,
+  tool_name_pattern TEXT,
+  command_pattern TEXT,
+  file_path_pattern TEXT,
+  session_cwd_pattern TEXT,
+  decision TEXT NOT NULL,
+  reason TEXT,
+  updated_input TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  hit_count INTEGER DEFAULT 0,
+  last_hit_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS permission_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rule_id INTEGER,
+  rule_name TEXT,
+  session_id TEXT,
+  tool_name TEXT,
+  tool_input TEXT,
+  decision TEXT,
+  reason TEXT,
+  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (rule_id) REFERENCES permission_rules(id)
+);
+
+CREATE TABLE IF NOT EXISTS session_flags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  project_cwd TEXT,
+  flag_type TEXT NOT NULL,
+  message TEXT NOT NULL,
+  file_path TEXT,
+  resolved INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TIMESTAMP,
+  resolved_by_session TEXT
+);
 `;
 
 const MIGRATIONS = [
