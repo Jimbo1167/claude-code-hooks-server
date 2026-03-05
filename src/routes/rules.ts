@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db/database';
+import { generateSuggestions, dismissSuggestion } from '../rules/suggestions';
 
 const router = Router();
 
@@ -19,6 +20,20 @@ router.get('/rules/audit-log', (_req: Request, res: Response) => {
     LIMIT 50
   `).all();
   res.json(entries);
+});
+
+// Get rule suggestions
+router.get('/rules/suggestions', (_req: Request, res: Response) => {
+  const suggestions = generateSuggestions();
+  res.json(suggestions);
+});
+
+// Dismiss a suggestion
+router.post('/rules/suggestions/:key/dismiss', (req: Request, res: Response) => {
+  const { key } = req.params;
+  const { hit_count } = req.body;
+  dismissSuggestion(decodeURIComponent(key), hit_count || 0);
+  res.json({ dismissed: true });
 });
 
 // Create a rule
