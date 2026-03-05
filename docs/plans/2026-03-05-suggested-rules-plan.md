@@ -54,17 +54,19 @@ git commit -m "feat: add hook_event_log and dismissed_suggestions tables"
 
 ---
 
-### Task 2: Log hook events on pre-tool-use
+### Task 2: Log permission-request events for suggestion aggregation
 
 **Files:**
 - Modify: `src/routes/hooks.ts`
 
-**Step 1: Add event logging to the pre-tool-use handler**
+**Step 1: Add event logging to the permission-request handler**
 
-In `src/routes/hooks.ts`, in the `router.post('/pre-tool-use', ...)` handler, add this block **after** the existing `hook_events` insert (line 79) and **before** `const ruleResponse = evaluateRules(event);` (line 81):
+In `src/routes/hooks.ts`, in the `router.post('/permission-request', ...)` handler, add this block **after** the existing `hook_events` insert (line 112) and **before** the `// Evaluate rules` comment (line 114):
 
 ```typescript
   // Log to hook_event_log for suggestion aggregation
+  // Only permission-request events matter — these are the friction points
+  // where the user is being asked to approve something manually
   db.prepare(`
     INSERT INTO hook_event_log (tool_name, command, file_path, session_id, session_cwd)
     VALUES (?, ?, ?, ?, ?)
@@ -80,12 +82,12 @@ In `src/routes/hooks.ts`, in the `router.post('/pre-tool-use', ...)` handler, ad
   db.prepare(`DELETE FROM hook_event_log WHERE timestamp < datetime('now', '-7 days')`).run();
 ```
 
-**Step 2: Verify the server starts and the pre-tool-use endpoint works**
+**Step 2: Verify the server starts and the permission-request endpoint works**
 
 Run: `cd /Users/jamesschindler/projects/hooks-server && npx tsx src/index.ts &`
 Then test with curl:
 ```bash
-curl -s -X POST http://localhost:3003/hooks/pre-tool-use \
+curl -s -X POST http://localhost:3003/hooks/permission-request \
   -H 'Content-Type: application/json' \
   -d '{"session_id":"test-123","tool_name":"Bash","tool_input":{"command":"bun test"},"cwd":"/Users/test/project"}'
 ```
@@ -95,7 +97,7 @@ Expected: `{}` (no rule match). The event should be logged in `hook_event_log`.
 
 ```bash
 git add src/routes/hooks.ts
-git commit -m "feat: log hook events to hook_event_log for suggestion aggregation"
+git commit -m "feat: log permission-request events to hook_event_log for suggestion aggregation"
 ```
 
 ---
@@ -637,17 +639,17 @@ cd /Users/jamesschindler/projects/hooks-server && npx tsx src/index.ts
 
 **Step 2: Seed some hook events**
 
-Run these curls to simulate repeated tool usage:
+Run these curls to simulate repeated permission requests (the friction points):
 
 ```bash
 for i in $(seq 1 5); do
-  curl -s -X POST http://localhost:3003/hooks/pre-tool-use \
+  curl -s -X POST http://localhost:3003/hooks/permission-request \
     -H 'Content-Type: application/json' \
     -d '{"session_id":"test-e2e","tool_name":"Bash","tool_input":{"command":"bun test"},"cwd":"/Users/test/project"}'
 done
 
 for i in $(seq 1 4); do
-  curl -s -X POST http://localhost:3003/hooks/pre-tool-use \
+  curl -s -X POST http://localhost:3003/hooks/permission-request \
     -H 'Content-Type: application/json' \
     -d '{"session_id":"test-e2e","tool_name":"Read","tool_input":{"file_path":"/Users/test/project/src/index.ts"},"cwd":"/Users/test/project"}'
 done

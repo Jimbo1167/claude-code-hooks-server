@@ -11,7 +11,7 @@ Analyze hook event traffic to identify frequently-used tool+pattern combinations
 
 ### New Table: `hook_event_log`
 
-Captures every `/hooks/pre-tool-use` call for aggregation.
+Captures every `/hooks/permission-request` call for aggregation. These are the friction points where users are manually approving tool usage — exactly the events we want to suggest rules for.
 
 | Column      | Type      | Notes                              |
 |-------------|-----------|------------------------------------|
@@ -23,7 +23,8 @@ Captures every `/hooks/pre-tool-use` call for aggregation.
 | session_cwd | TEXT      |                                    |
 | timestamp   | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP          |
 
-- Populated on every `/hooks/pre-tool-use` call, before rule evaluation.
+- Populated on every `/hooks/permission-request` call, before rule evaluation.
+- Only permission requests are logged — pre-tool-use events that are auto-allowed don't need rules.
 - Key fields extracted and normalized (not raw JSON) for fast aggregation.
 - **Retention:** Auto-prune entries older than 7 days.
 
