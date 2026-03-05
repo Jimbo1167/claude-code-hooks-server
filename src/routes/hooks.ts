@@ -111,6 +111,23 @@ router.post('/permission-request', (req: Request, res: Response) => {
     VALUES (?, 'PermissionRequest', ?, ?)
   `).run(event.session_id, event.tool_name || null, JSON.stringify(event.tool_input || null));
 
+  // Log to hook_event_log for suggestion aggregation
+  // Only permission-request events matter — these are the friction points
+  // where the user is being asked to approve something manually
+  db.prepare(`
+    INSERT INTO hook_event_log (tool_name, command, file_path, session_id, session_cwd)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    event.tool_name || null,
+    event.tool_input?.command ? String(event.tool_input.command) : null,
+    event.tool_input?.file_path ? String(event.tool_input.file_path) : null,
+    event.session_id,
+    event.cwd || null
+  );
+
+  // Prune old event log entries (7-day retention)
+  db.prepare(`DELETE FROM hook_event_log WHERE timestamp < datetime('now', '-7 days')`).run();
+
   // Evaluate rules - but convert to PermissionRequest format
   const ruleResponse = evaluateRules(event);
   if (ruleResponse.hookSpecificOutput?.permissionDecision) {
