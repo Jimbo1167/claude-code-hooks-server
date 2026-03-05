@@ -33,3 +33,38 @@ export interface StoredHookEvent {
   source: string | null;
   last_assistant_message: string | null;
 }
+
+export interface HookResponse {
+  hookSpecificOutput?: {
+    hookEventName: string;
+    permissionDecision?: 'allow' | 'deny' | 'ask';
+    permissionDecisionReason?: string;
+    updatedInput?: Record<string, unknown>;
+    additionalContext?: string;
+    decision?: {
+      behavior: 'allow' | 'deny';
+      message?: string;
+      updatedPermissions?: Array<{ type: string; tool: string }>;
+    };
+  };
+  decision?: 'block';
+  reason?: string;
+}
+
+export interface PermissionRule {
+  id: number;
+  name: string;
+  description: string | null;
+  enabled: number;
+  priority: number;
+  tool_name_pattern: string | null;
+  command_pattern: string | null;
+  file_path_pattern: string | null;
+  session_cwd_pattern: string | null;
+  decision: 'allow' | 'deny' | 'ask';
+  reason: string | null;
+  updated_input: string | null;
+  created_at: string;
+  hit_count: number;
+  last_hit_at: string | null;
+}
