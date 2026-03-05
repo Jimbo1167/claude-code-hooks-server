@@ -120,6 +120,24 @@
       font-family: monospace;
     }
     .top-tools-list span { color: #e1e4e8; }
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #3fb950;
+      margin-right: 6px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.4); }
+      50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(63, 185, 80, 0); }
+    }
+    .session-duration {
+      font-size: 0.78rem;
+      color: #8b949e;
+      font-family: monospace;
+    }
   </style>
 </head>
 <body>
@@ -163,6 +181,24 @@
     let selectedSessionId = null;
     let selectedProject = null;
 
+    function formatDuration(ms) {
+      const totalSec = Math.floor(ms / 1000);
+      if (totalSec < 0) return '0s';
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      if (h > 0) return `${h}h ${m}m ${s}s`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    }
+
+    setInterval(() => {
+      document.querySelectorAll('.session-duration[data-start]').forEach(el => {
+        const startMs = parseInt(el.getAttribute('data-start'));
+        el.textContent = formatDuration(Date.now() - startMs);
+      });
+    }, 1000);
+
     async function loadSessions() {
       try {
         const res = await fetch('/api/sessions');
@@ -176,7 +212,8 @@
 
         container.innerHTML = sessions.map(s => {
           const started = new Date(s.started_at + 'Z').toLocaleString();
-          const status = s.ended_at ? 'ended' : 'active';
+          const startMs = new Date(s.started_at + 'Z').getTime();
+          const endMs = s.ended_at ? new Date(s.ended_at + 'Z').getTime() : null;
           return `
             <div class="session-card ${s.id === selectedSessionId ? 'active' : ''}"
                  onclick="selectSession('${s.id}')">
@@ -186,11 +223,16 @@
                   <span>${started}</span>
                   <span>${s.cwd || ''}</span>
                   <span>${s.model || ''}</span>
+                  <span class="session-duration" ${!s.ended_at ? `data-start="${startMs}"` : ''}>
+                    ${!s.ended_at ? formatDuration(Date.now() - startMs) : formatDuration(endMs - startMs)}
+                  </span>
                 </div>
               </div>
               <div>
                 <span class="badge">${s.event_count} tools</span>
-                <span class="badge">${status}</span>
+                ${!s.ended_at
+                  ? '<span class="badge"><span class="pulse-dot"></span>active</span>'
+                  : '<span class="badge">ended</span>'}
               </div>
             </div>
           `;
