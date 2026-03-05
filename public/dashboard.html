@@ -208,6 +208,29 @@
       border-radius: 50%;
       margin-right: 4px;
     }
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .filter-bar label {
+      font-size: 0.8rem;
+      color: #8b949e;
+    }
+    .filter-bar select {
+      background: #161b22;
+      color: #e1e4e8;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .filter-bar select:focus {
+      outline: none;
+      border-color: #c9a0ff;
+    }
   </style>
 </head>
 <body>
@@ -234,6 +257,13 @@
         <div class="stat-label">Top Tools</div>
         <div class="top-tools-list" id="stat-top-tools">-</div>
       </div>
+    </div>
+
+    <div class="filter-bar">
+      <label for="project-filter">Project:</label>
+      <select id="project-filter" onchange="filterByProject(this.value)">
+        <option value="">All Projects</option>
+      </select>
     </div>
 
     <h2>Recent Sessions</h2>
@@ -271,7 +301,8 @@
 
     async function loadSessions() {
       try {
-        const res = await fetch('/api/sessions');
+        const cwdParam = selectedProject ? `?cwd=${encodeURIComponent(selectedProject)}` : '';
+        const res = await fetch(`/api/sessions${cwdParam}`);
         const sessions = await res.json();
         const container = document.getElementById('sessions-list');
 
@@ -430,6 +461,7 @@
     }
 
     async function refresh() {
+      loadProjects();
       await loadSessions();
       loadStats();
       if (selectedSessionId) {
@@ -462,8 +494,31 @@
       return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    async function loadProjects() {
+      try {
+        const res = await fetch('/api/projects');
+        const projects = await res.json();
+        const select = document.getElementById('project-filter');
+        const current = select.value;
+        select.innerHTML = '<option value="">All Projects</option>' +
+          projects.map(p =>
+            `<option value="${escapeHtml(p.cwd)}" title="${escapeHtml(p.cwd)}" ${p.cwd === current ? 'selected' : ''}>${escapeHtml(p.basename)} (${p.session_count})</option>`
+          ).join('');
+      } catch (e) {
+        console.error('Failed to load projects:', e);
+      }
+    }
+
+    function filterByProject(cwd) {
+      selectedProject = cwd || null;
+      selectedSessionId = null;
+      document.getElementById('events-panel').style.display = 'none';
+      refresh();
+    }
+
     loadSessions();
     loadStats();
+    loadProjects();
     setInterval(refresh, 5000);
   </script>
 </body>
