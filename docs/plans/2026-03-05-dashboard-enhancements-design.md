@@ -35,8 +35,8 @@ Returns distinct cwd values:
 
 ```json
 [
-  { "cwd": "/Users/jamesschindler/projects/claude_dashboard", "basename": "claude_dashboard", "session_count": 5 },
-  { "cwd": "/Users/jamesschindler/projects/live-odds-lab", "basename": "live-odds-lab", "session_count": 12 }
+  { "cwd": "/home/user/projects/my-project", "basename": "my-project", "session_count": 5 },
+  { "cwd": "/home/user/projects/another-project", "basename": "another-project", "session_count": 12 }
 ]
 ```
 

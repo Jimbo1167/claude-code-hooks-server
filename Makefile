@@ -1,4 +1,5 @@
-COMPOSE := docker compose -f /Users/jamesschindler/projects/mac-home-server/docker-compose.yml
+COMPOSE_FILE ?= ../mac-home-server/docker-compose.yml
+COMPOSE := docker compose -f $(COMPOSE_FILE)
 SERVICE := claude-hooks
 
 .PHONY: deploy rebuild restart stop logs status dev clean

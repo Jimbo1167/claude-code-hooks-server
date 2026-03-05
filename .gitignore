@@ -1,4 +1,7 @@
 node_modules/
 dist/
 *.db
+*.db-shm
+*.db-wal
 .env
+docs/investigations/2026-03-05-nanoclaw-agent-sdk-integration.md
