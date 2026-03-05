@@ -86,6 +86,40 @@
       font-size: 0.75rem;
       color: #484f58;
     }
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px 18px;
+    }
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #e1e4e8;
+    }
+    .stat-secondary {
+      font-size: 0.75rem;
+      color: #484f58;
+      margin-left: 6px;
+    }
+    .stat-label {
+      font-size: 0.75rem;
+      color: #8b949e;
+      margin-top: 4px;
+    }
+    .top-tools-list {
+      font-size: 0.78rem;
+      color: #8b949e;
+      margin-top: 4px;
+      font-family: monospace;
+    }
+    .top-tools-list span { color: #e1e4e8; }
   </style>
 </head>
 <body>
@@ -93,6 +127,25 @@
     <div class="status-bar">
       <h1>Claude Code Hooks Dashboard</h1>
       <span class="refresh-indicator" id="refresh-indicator">Auto-refresh: 5s</span>
+    </div>
+
+    <div class="stats-bar" id="stats-bar">
+      <div class="stat-card">
+        <div><span class="stat-value" id="stat-sessions-today">-</span><span class="stat-secondary" id="stat-sessions-all"></span></div>
+        <div class="stat-label">Sessions Today</div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-value" id="stat-tools-today">-</span><span class="stat-secondary" id="stat-tools-all"></span></div>
+        <div class="stat-label">Tool Calls Today</div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-value" id="stat-active">-</span></div>
+        <div class="stat-label">Active Now</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Top Tools</div>
+        <div class="top-tools-list" id="stat-top-tools">-</div>
+      </div>
     </div>
 
     <h2>Recent Sessions</h2>
@@ -108,6 +161,7 @@
 
   <script>
     let selectedSessionId = null;
+    let selectedProject = null;
 
     async function loadSessions() {
       try {
@@ -195,14 +249,34 @@
       }
     }
 
+    async function loadStats() {
+      try {
+        const cwdParam = selectedProject ? `?cwd=${encodeURIComponent(selectedProject)}` : '';
+        const res = await fetch(`/api/stats${cwdParam}`);
+        const s = await res.json();
+        document.getElementById('stat-sessions-today').textContent = s.sessions_today;
+        document.getElementById('stat-sessions-all').textContent = `/ ${s.sessions_all_time} all time`;
+        document.getElementById('stat-tools-today').textContent = s.tools_today;
+        document.getElementById('stat-tools-all').textContent = `/ ${s.tools_all_time} all time`;
+        document.getElementById('stat-active').textContent = s.active_sessions;
+        document.getElementById('stat-top-tools').innerHTML = s.top_tools.length
+          ? s.top_tools.map(t => `<span>${t.tool_name}</span> ${t.count}`).join(' &middot; ')
+          : 'No data yet';
+      } catch (e) {
+        console.error('Failed to load stats:', e);
+      }
+    }
+
     async function refresh() {
       await loadSessions();
+      loadStats();
       if (selectedSessionId) {
         await loadEvents(selectedSessionId);
       }
     }
 
     loadSessions();
+    loadStats();
     setInterval(refresh, 5000);
   </script>
 </body>
