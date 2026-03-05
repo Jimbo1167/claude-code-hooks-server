@@ -231,6 +231,167 @@
       outline: none;
       border-color: #c9a0ff;
     }
+
+    /* Tab Navigation */
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #30363d;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      color: #8b949e;
+      font-size: 0.9rem;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .tab:hover { color: #e1e4e8; }
+    .tab.active { color: #c9a0ff; border-bottom-color: #c9a0ff; }
+
+    /* Buttons */
+    .btn-primary {
+      background: #c9a0ff;
+      color: #0f1117;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-primary:hover { background: #d4b3ff; }
+    .btn-danger {
+      background: transparent;
+      color: #f85149;
+      border: 1px solid #f85149;
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .btn-danger:hover { background: #f8514920; }
+    .btn-small {
+      background: #30363d;
+      color: #e1e4e8;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .btn-small:hover { background: #484f58; }
+
+    /* Data Tables */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .data-table th {
+      text-align: left;
+      padding: 8px 12px;
+      color: #8b949e;
+      font-weight: 600;
+      border-bottom: 1px solid #30363d;
+    }
+    .data-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #21262d;
+      color: #e1e4e8;
+    }
+    .data-table tr:hover td { background: #1c2230; }
+
+    /* Form Overlay */
+    .form-overlay {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .form-overlay label {
+      display: block;
+      font-size: 0.8rem;
+      color: #8b949e;
+      margin-bottom: 4px;
+      margin-top: 12px;
+    }
+    .form-overlay label:first-child { margin-top: 0; }
+    .form-overlay input[type="text"],
+    .form-overlay input[type="number"],
+    .form-overlay textarea,
+    .form-overlay select {
+      width: 100%;
+      background: #0d1117;
+      color: #e1e4e8;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      font-family: monospace;
+    }
+    .form-overlay input:focus,
+    .form-overlay textarea:focus,
+    .form-overlay select:focus {
+      outline: none;
+      border-color: #c9a0ff;
+    }
+    .form-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    /* Badges */
+    .flag-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .decision-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .decision-allow { background: #3fb95020; color: #3fb950; }
+    .decision-deny { background: #f8514920; color: #f85149; }
+    .decision-ask { background: #d2992220; color: #d29922; }
+
+    /* Toggle Switch */
+    .toggle-switch {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      display: inline-block;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #30363d;
+      border-radius: 10px;
+      transition: 0.2s;
+    }
+    .toggle-slider:before {
+      content: "";
+      position: absolute;
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background: #e1e4e8;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    .toggle-switch input:checked + .toggle-slider { background: #3fb950; }
+    .toggle-switch input:checked + .toggle-slider:before { transform: translateX(16px); }
   </style>
 </head>
 <body>
@@ -240,46 +401,165 @@
       <span class="refresh-indicator" id="refresh-indicator">Auto-refresh: 5s</span>
     </div>
 
-    <div class="stats-bar" id="stats-bar">
-      <div class="stat-card">
-        <div><span class="stat-value" id="stat-sessions-today">-</span><span class="stat-secondary" id="stat-sessions-all"></span></div>
-        <div class="stat-label">Sessions Today</div>
+    <div class="tab-bar">
+      <div class="tab active" data-tab="sessions" onclick="switchTab('sessions')">Sessions</div>
+      <div class="tab" data-tab="rules" onclick="switchTab('rules')">Rules</div>
+      <div class="tab" data-tab="flags" onclick="switchTab('flags')">Flags</div>
+    </div>
+
+    <div id="tab-sessions">
+      <div class="stats-bar" id="stats-bar">
+        <div class="stat-card">
+          <div><span class="stat-value" id="stat-sessions-today">-</span><span class="stat-secondary" id="stat-sessions-all"></span></div>
+          <div class="stat-label">Sessions Today</div>
+        </div>
+        <div class="stat-card">
+          <div><span class="stat-value" id="stat-tools-today">-</span><span class="stat-secondary" id="stat-tools-all"></span></div>
+          <div class="stat-label">Tool Calls Today</div>
+        </div>
+        <div class="stat-card">
+          <div><span class="stat-value" id="stat-active">-</span></div>
+          <div class="stat-label">Active Now</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Top Tools</div>
+          <div class="top-tools-list" id="stat-top-tools">-</div>
+        </div>
       </div>
-      <div class="stat-card">
-        <div><span class="stat-value" id="stat-tools-today">-</span><span class="stat-secondary" id="stat-tools-all"></span></div>
-        <div class="stat-label">Tool Calls Today</div>
+
+      <div class="filter-bar">
+        <label for="project-filter">Project:</label>
+        <select id="project-filter" onchange="filterByProject(this.value)">
+          <option value="">All Projects</option>
+        </select>
       </div>
-      <div class="stat-card">
-        <div><span class="stat-value" id="stat-active">-</span></div>
-        <div class="stat-label">Active Now</div>
+
+      <h2>Recent Sessions</h2>
+      <div class="sessions-list" id="sessions-list">
+        <div class="empty-state">No sessions yet. Configure hooks to start monitoring.</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Top Tools</div>
-        <div class="top-tools-list" id="stat-top-tools">-</div>
+
+      <div id="events-panel" style="display:none;">
+        <h2>Events for <span id="selected-session-id" class="session-id"></span></h2>
+        <div class="events-panel" id="events-list"></div>
       </div>
     </div>
 
-    <div class="filter-bar">
-      <label for="project-filter">Project:</label>
-      <select id="project-filter" onchange="filterByProject(this.value)">
-        <option value="">All Projects</option>
-      </select>
+    <div id="tab-rules" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin-bottom:0;">Permission Rules</h2>
+        <button class="btn-primary" onclick="showRuleForm()">Add Rule</button>
+      </div>
+
+      <div id="rule-form" class="form-overlay" style="display:none;">
+        <label>Name *</label>
+        <input type="text" id="rule-name" required>
+        <label>Description</label>
+        <input type="text" id="rule-description">
+        <label>Tool Name Pattern</label>
+        <input type="text" id="rule-tool-pattern" placeholder="e.g. Bash|Write">
+        <label>Command Pattern</label>
+        <input type="text" id="rule-command-pattern" placeholder="e.g. rm\\s+-rf">
+        <label>File Path Pattern</label>
+        <input type="text" id="rule-filepath-pattern" placeholder="e.g. ^/etc/">
+        <label>Session CWD Pattern</label>
+        <input type="text" id="rule-cwd-pattern">
+        <label>Decision *</label>
+        <select id="rule-decision">
+          <option value="deny">deny</option>
+          <option value="allow">allow</option>
+          <option value="ask">ask</option>
+        </select>
+        <label>Reason</label>
+        <input type="text" id="rule-reason">
+        <label>Priority</label>
+        <input type="number" id="rule-priority" value="0">
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="rule-enabled" checked> Enabled
+        </label>
+        <div class="form-actions">
+          <button class="btn-primary" onclick="saveRule()">Save</button>
+          <button class="btn-small" onclick="hideRuleForm()">Cancel</button>
+        </div>
+      </div>
+
+      <table class="data-table" id="rules-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Tool Pattern</th>
+            <th>Command Pattern</th>
+            <th>Decision</th>
+            <th>Priority</th>
+            <th>Hits</th>
+            <th>Enabled</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rules-tbody"></tbody>
+      </table>
+
+      <h2 style="margin-top:24px;">Recent Audit Log</h2>
+      <table class="data-table" id="audit-table">
+        <thead>
+          <tr><th>Time</th><th>Rule</th><th>Session</th><th>Tool</th><th>Decision</th><th>Reason</th></tr>
+        </thead>
+        <tbody id="audit-tbody"></tbody>
+      </table>
     </div>
 
-    <h2>Recent Sessions</h2>
-    <div class="sessions-list" id="sessions-list">
-      <div class="empty-state">No sessions yet. Configure hooks to start monitoring.</div>
-    </div>
+    <div id="tab-flags" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin-bottom:0;">Session Flags</h2>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <label style="font-size:0.8rem;color:#8b949e;">
+            <input type="checkbox" id="show-resolved" onchange="loadFlags()"> Show resolved
+          </label>
+          <button class="btn-primary" onclick="showFlagForm()">Add Flag</button>
+        </div>
+      </div>
 
-    <div id="events-panel" style="display:none;">
-      <h2>Events for <span id="selected-session-id" class="session-id"></span></h2>
-      <div class="events-panel" id="events-list"></div>
+      <div id="flag-form" class="form-overlay" style="display:none;">
+        <label>Type *</label>
+        <select id="flag-type">
+          <option value="bug">bug</option>
+          <option value="warning">warning</option>
+          <option value="info">info</option>
+          <option value="conflict">conflict</option>
+        </select>
+        <label>Message *</label>
+        <textarea id="flag-message" rows="3" required></textarea>
+        <label>Project CWD</label>
+        <input type="text" id="flag-project-cwd">
+        <label>File Path</label>
+        <input type="text" id="flag-file-path">
+        <div class="form-actions">
+          <button class="btn-primary" onclick="saveFlag()">Save</button>
+          <button class="btn-small" onclick="hideFlagForm()">Cancel</button>
+        </div>
+      </div>
+
+      <table class="data-table" id="flags-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Message</th>
+            <th>Project</th>
+            <th>File</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="flags-tbody"></tbody>
+      </table>
     </div>
   </div>
 
   <script>
     let selectedSessionId = null;
     let selectedProject = null;
+    let currentTab = 'sessions';
+    let editingRuleId = null;
 
     function formatDuration(ms) {
       const totalSec = Math.floor(ms / 1000);
@@ -299,6 +579,19 @@
       });
     }, 1000);
 
+    // Tab Navigation
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      document.getElementById('tab-sessions').style.display = tab === 'sessions' ? 'block' : 'none';
+      document.getElementById('tab-rules').style.display = tab === 'rules' ? 'block' : 'none';
+      document.getElementById('tab-flags').style.display = tab === 'flags' ? 'block' : 'none';
+
+      if (tab === 'rules') { loadRules(); loadAuditLog(); }
+      if (tab === 'flags') { loadFlags(); }
+    }
+
+    // Sessions
     async function loadSessions() {
       try {
         const cwdParam = selectedProject ? `?cwd=${encodeURIComponent(selectedProject)}` : '';
@@ -514,6 +807,181 @@
       selectedSessionId = null;
       document.getElementById('events-panel').style.display = 'none';
       refresh();
+    }
+
+    // Rules
+    async function loadRules() {
+      const res = await fetch('/api/rules');
+      const rules = await res.json();
+      const tbody = document.getElementById('rules-tbody');
+      if (rules.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#484f58;padding:20px;">No rules defined. Click "Add Rule" to create one.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rules.map(r => `
+        <tr>
+          <td><strong>${escapeHtml(r.name)}</strong>${r.description ? '<br><span style="color:#8b949e;font-size:0.75rem;">' + escapeHtml(r.description) + '</span>' : ''}</td>
+          <td style="font-family:monospace;font-size:0.78rem;">${escapeHtml(r.tool_name_pattern || '*')}</td>
+          <td style="font-family:monospace;font-size:0.78rem;">${escapeHtml(r.command_pattern || '-')}</td>
+          <td><span class="decision-badge decision-${r.decision}">${r.decision}</span></td>
+          <td>${r.priority}</td>
+          <td>${r.hit_count}${r.last_hit_at ? '<br><span style="color:#484f58;font-size:0.7rem;">' + new Date(r.last_hit_at + 'Z').toLocaleString() + '</span>' : ''}</td>
+          <td>
+            <label class="toggle-switch">
+              <input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="toggleRule(${r.id}, this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </td>
+          <td>
+            <button class="btn-small" onclick="editRule(${r.id})" style="margin-right:4px;">Edit</button>
+            <button class="btn-danger" onclick="deleteRule(${r.id})">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function showRuleForm(rule) {
+      editingRuleId = rule ? rule.id : null;
+      const form = document.getElementById('rule-form');
+      form.style.display = 'block';
+      document.getElementById('rule-name').value = rule?.name || '';
+      document.getElementById('rule-description').value = rule?.description || '';
+      document.getElementById('rule-tool-pattern').value = rule?.tool_name_pattern || '';
+      document.getElementById('rule-command-pattern').value = rule?.command_pattern || '';
+      document.getElementById('rule-filepath-pattern').value = rule?.file_path_pattern || '';
+      document.getElementById('rule-cwd-pattern').value = rule?.session_cwd_pattern || '';
+      document.getElementById('rule-decision').value = rule?.decision || 'deny';
+      document.getElementById('rule-reason').value = rule?.reason || '';
+      document.getElementById('rule-priority').value = rule?.priority ?? 0;
+      document.getElementById('rule-enabled').checked = rule?.enabled ?? true;
+    }
+
+    function hideRuleForm() {
+      document.getElementById('rule-form').style.display = 'none';
+      editingRuleId = null;
+    }
+
+    async function saveRule() {
+      const body = {
+        name: document.getElementById('rule-name').value,
+        description: document.getElementById('rule-description').value || null,
+        tool_name_pattern: document.getElementById('rule-tool-pattern').value || null,
+        command_pattern: document.getElementById('rule-command-pattern').value || null,
+        file_path_pattern: document.getElementById('rule-filepath-pattern').value || null,
+        session_cwd_pattern: document.getElementById('rule-cwd-pattern').value || null,
+        decision: document.getElementById('rule-decision').value,
+        reason: document.getElementById('rule-reason').value || null,
+        priority: parseInt(document.getElementById('rule-priority').value) || 0,
+        enabled: document.getElementById('rule-enabled').checked ? 1 : 0,
+      };
+
+      const url = editingRuleId ? `/api/rules/${editingRuleId}` : '/api/rules';
+      const method = editingRuleId ? 'PUT' : 'POST';
+      await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      hideRuleForm();
+      loadRules();
+    }
+
+    async function editRule(id) {
+      const res = await fetch('/api/rules');
+      const rules = await res.json();
+      const rule = rules.find(r => r.id === id);
+      if (rule) showRuleForm(rule);
+    }
+
+    async function toggleRule(id, enabled) {
+      await fetch(`/api/rules/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: enabled ? 1 : 0 }),
+      });
+    }
+
+    async function deleteRule(id) {
+      if (!confirm('Delete this rule?')) return;
+      await fetch(`/api/rules/${id}`, { method: 'DELETE' });
+      loadRules();
+    }
+
+    async function loadAuditLog() {
+      const res = await fetch('/api/rules/audit-log');
+      const entries = await res.json();
+      const tbody = document.getElementById('audit-tbody');
+      if (entries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#484f58;padding:20px;">No audit entries yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = entries.map(e => `
+        <tr>
+          <td style="font-size:0.78rem;color:#8b949e;">${new Date(e.timestamp + 'Z').toLocaleString()}</td>
+          <td>${escapeHtml(e.rule_name || 'Unknown')}</td>
+          <td style="font-family:monospace;font-size:0.75rem;">${escapeHtml((e.session_id || '').substring(0, 12))}...</td>
+          <td>${escapeHtml(e.tool_name || '-')}</td>
+          <td><span class="decision-badge decision-${e.decision}">${e.decision}</span></td>
+          <td style="font-size:0.78rem;color:#8b949e;">${escapeHtml(e.reason || '-')}</td>
+        </tr>
+      `).join('');
+    }
+
+    // Flags
+    const FLAG_COLORS = { bug: '#f85149', warning: '#d29922', info: '#79c0ff', conflict: '#ffa657' };
+
+    async function loadFlags() {
+      const resolved = document.getElementById('show-resolved')?.checked ? '1' : '0';
+      const res = await fetch(`/api/flags?resolved=${resolved}`);
+      const flags = await res.json();
+      const tbody = document.getElementById('flags-tbody');
+      if (flags.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#484f58;padding:20px;">No flags.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = flags.map(f => {
+        const color = FLAG_COLORS[f.flag_type] || '#8b949e';
+        return `
+          <tr>
+            <td><span class="flag-badge" style="background:${color}20;color:${color};">${escapeHtml(f.flag_type)}</span></td>
+            <td>${escapeHtml(f.message)}</td>
+            <td style="font-size:0.78rem;color:#8b949e;">${escapeHtml(f.project_cwd?.split('/').pop() || '-')}</td>
+            <td style="font-family:monospace;font-size:0.75rem;">${escapeHtml(f.file_path || '-')}</td>
+            <td style="font-size:0.78rem;color:#8b949e;">${new Date(f.created_at + 'Z').toLocaleString()}</td>
+            <td>
+              ${!f.resolved ? `<button class="btn-small" onclick="resolveFlag(${f.id})" style="margin-right:4px;">Resolve</button>` : '<span style="color:#3fb950;font-size:0.75rem;">Resolved</span>'}
+              <button class="btn-danger" onclick="deleteFlag(${f.id})">Delete</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function showFlagForm() {
+      document.getElementById('flag-form').style.display = 'block';
+    }
+
+    function hideFlagForm() {
+      document.getElementById('flag-form').style.display = 'none';
+    }
+
+    async function saveFlag() {
+      const body = {
+        flag_type: document.getElementById('flag-type').value,
+        message: document.getElementById('flag-message').value,
+        project_cwd: document.getElementById('flag-project-cwd').value || null,
+        file_path: document.getElementById('flag-file-path').value || null,
+      };
+      await fetch('/api/flags', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      hideFlagForm();
+      loadFlags();
+    }
+
+    async function resolveFlag(id) {
+      await fetch(`/api/flags/${id}/resolve`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      loadFlags();
+    }
+
+    async function deleteFlag(id) {
+      if (!confirm('Delete this flag?')) return;
+      await fetch(`/api/flags/${id}`, { method: 'DELETE' });
+      loadFlags();
     }
 
     loadSessions();
