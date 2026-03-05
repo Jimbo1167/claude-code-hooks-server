@@ -3,16 +3,39 @@ import { getDb } from '../db/database';
 
 const router = Router();
 
-router.get('/sessions', (_req: Request, res: Response) => {
+router.get('/projects', (_req: Request, res: Response) => {
   const db = getDb();
+  const projects = db.prepare(`
+    SELECT cwd, COUNT(*) as session_count
+    FROM sessions
+    WHERE cwd IS NOT NULL AND cwd != ''
+    GROUP BY cwd
+    ORDER BY session_count DESC
+  `).all() as { cwd: string; session_count: number }[];
+
+  res.json(projects.map(p => ({
+    cwd: p.cwd,
+    basename: p.cwd.split('/').pop() || p.cwd,
+    session_count: p.session_count,
+  })));
+});
+
+router.get('/sessions', (req: Request, res: Response) => {
+  const cwd = req.query.cwd as string | undefined;
+  const db = getDb();
+
+  const cwdFilter = cwd ? 'WHERE s.cwd = ?' : '';
+  const params = cwd ? [cwd] : [];
+
   const sessions = db.prepare(`
     SELECT s.*, COUNT(e.id) as event_count
     FROM sessions s
     LEFT JOIN hook_events e ON s.id = e.session_id AND e.hook_event_name IN ('PreToolUse', 'PostToolUse')
+    ${cwdFilter}
     GROUP BY s.id
     ORDER BY s.started_at DESC
     LIMIT 10
-  `).all();
+  `).all(...params);
 
   res.json(sessions);
 });
