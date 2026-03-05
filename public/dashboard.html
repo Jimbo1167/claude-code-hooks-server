@@ -138,6 +138,42 @@
       color: #8b949e;
       font-family: monospace;
     }
+    .event-row.expandable { cursor: pointer; }
+    .event-row.expandable:hover { background: #1c2230; }
+    .chevron {
+      display: inline-block;
+      transition: transform 0.15s;
+      margin-right: 4px;
+      font-size: 0.7rem;
+      color: #484f58;
+    }
+    .chevron.open { transform: rotate(90deg); }
+    .event-expanded {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 4px 0 8px 0;
+      position: relative;
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: #8b949e;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: #30363d;
+      color: #e1e4e8;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #484f58; }
   </style>
 </head>
 <body>
@@ -263,11 +299,12 @@
           return;
         }
 
-        container.innerHTML = events.map(e => {
+        container.innerHTML = events.map((e, i) => {
           const time = new Date(e.timestamp + 'Z').toLocaleTimeString();
+          const hasInput = e.tool_input && e.tool_input !== 'null';
           let detail = '';
           if (e.tool_name) detail += e.tool_name;
-          if (e.tool_input) {
+          if (hasInput) {
             try {
               const input = JSON.parse(e.tool_input);
               if (input && typeof input === 'object') {
@@ -278,12 +315,26 @@
           }
           if (e.decision) detail += (detail ? ' | ' : '') + e.decision;
 
+          let expandedHtml = '';
+          if (hasInput) {
+            try {
+              const pretty = JSON.stringify(JSON.parse(e.tool_input), null, 2);
+              expandedHtml = `
+                <div class="event-expanded" id="expanded-${i}" style="display:none;">
+                  <button class="copy-btn" onclick="copyJson(event, ${i})">Copy</button>
+                  <pre style="margin:0;">${escapeHtml(pretty)}</pre>
+                </div>`;
+            } catch {}
+          }
+
           return `
-            <div class="event-row">
-              <span class="event-time">${time}</span>
+            <div class="event-row ${hasInput ? 'expandable' : ''}"
+                 ${hasInput ? `onclick="toggleExpand(${i})"` : ''}>
+              <span class="event-time">${hasInput ? '<span class="chevron" id="chev-' + i + '">&#9654;</span>' : ''}${time}</span>
               <span class="event-type ${e.hook_event_name}">${e.hook_event_name}</span>
               <span class="event-detail">${detail || '-'}</span>
             </div>
+            ${expandedHtml}
           `;
         }).join('');
       } catch (e) {
@@ -315,6 +366,31 @@
       if (selectedSessionId) {
         await loadEvents(selectedSessionId);
       }
+    }
+
+    function toggleExpand(i) {
+      const el = document.getElementById(`expanded-${i}`);
+      const chev = document.getElementById(`chev-${i}`);
+      if (!el) return;
+      const visible = el.style.display !== 'none';
+      el.style.display = visible ? 'none' : 'block';
+      if (chev) chev.classList.toggle('open', !visible);
+    }
+
+    function copyJson(event, i) {
+      event.stopPropagation();
+      const el = document.getElementById(`expanded-${i}`);
+      if (!el) return;
+      const pre = el.querySelector('pre');
+      navigator.clipboard.writeText(pre.textContent).then(() => {
+        const btn = el.querySelector('.copy-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+      });
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     loadSessions();
