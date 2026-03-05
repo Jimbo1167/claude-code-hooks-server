@@ -1,6 +1,9 @@
-COMPOSE_FILE ?= ../mac-home-server/docker-compose.yml
+# Override these in Makefile.local (gitignored)
+-include Makefile.local
+
+COMPOSE_FILE ?= docker-compose.yml
 COMPOSE := docker compose -f $(COMPOSE_FILE)
-SERVICE := claude-hooks
+SERVICE ?= claude-hooks
 
 .PHONY: deploy rebuild restart stop logs status dev clean
 
