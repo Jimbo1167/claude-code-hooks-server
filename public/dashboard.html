@@ -174,6 +174,40 @@
       cursor: pointer;
     }
     .copy-btn:hover { background: #484f58; }
+    .tool-breakdown {
+      display: flex;
+      border-radius: 6px;
+      overflow: hidden;
+      height: 24px;
+      margin-bottom: 16px;
+      background: #21262d;
+    }
+    .tool-segment {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #0d1117;
+      white-space: nowrap;
+      overflow: hidden;
+      min-width: 0;
+    }
+    .breakdown-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      margin-bottom: 12px;
+      font-size: 0.75rem;
+      color: #8b949e;
+    }
+    .legend-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
   </style>
 </head>
 <body>
@@ -288,6 +322,40 @@
       await loadEvents(id);
     }
 
+    const TOOL_COLORS = {
+      Bash: '#ffa657', Edit: '#7ee787', Read: '#79c0ff', Write: '#d2a8ff',
+      Grep: '#f778ba', Glob: '#ffd700', Agent: '#ff7b72', WebFetch: '#a5d6ff',
+    };
+    const DEFAULT_TOOL_COLOR = '#8b949e';
+
+    function renderToolBreakdown(events) {
+      const toolCounts = {};
+      events.forEach(e => {
+        if (e.hook_event_name === 'PreToolUse' && e.tool_name) {
+          toolCounts[e.tool_name] = (toolCounts[e.tool_name] || 0) + 1;
+        }
+      });
+
+      const entries = Object.entries(toolCounts).sort((a, b) => b[1] - a[1]);
+      if (entries.length === 0) return '';
+
+      const total = entries.reduce((s, e) => s + e[1], 0);
+
+      const bar = entries.map(([name, count]) => {
+        const pct = (count / total * 100).toFixed(1);
+        const color = TOOL_COLORS[name] || DEFAULT_TOOL_COLOR;
+        const label = pct > 8 ? `${name} ${count}` : '';
+        return `<div class="tool-segment" style="width:${pct}%;background:${color};" title="${name}: ${count}">${label}</div>`;
+      }).join('');
+
+      const legend = entries.map(([name, count]) => {
+        const color = TOOL_COLORS[name] || DEFAULT_TOOL_COLOR;
+        return `<span><span class="legend-dot" style="background:${color};"></span>${name}: ${count}</span>`;
+      }).join('');
+
+      return `<div class="tool-breakdown">${bar}</div><div class="breakdown-legend">${legend}</div>`;
+    }
+
     async function loadEvents(sessionId) {
       try {
         const res = await fetch(`/api/events?session_id=${encodeURIComponent(sessionId)}`);
@@ -299,7 +367,8 @@
           return;
         }
 
-        container.innerHTML = events.map((e, i) => {
+        const breakdownHtml = renderToolBreakdown(events);
+        container.innerHTML = breakdownHtml + events.map((e, i) => {
           const time = new Date(e.timestamp + 'Z').toLocaleTimeString();
           const hasInput = e.tool_input && e.tool_input !== 'null';
           let detail = '';
