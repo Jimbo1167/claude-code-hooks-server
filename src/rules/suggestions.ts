@@ -153,7 +153,7 @@ export function generateSuggestions(): Suggestion[] {
     if (isCoveredByExistingRule(
       agg.tool_name,
       isBash ? normalizedPattern : null,
-      isFileTool ? normalizedPattern : null,
+      isFileTool && normalizedPattern ? normalizedPattern + '/' : null,
       existingRules
     )) {
       continue;
