@@ -28,6 +28,19 @@
       align-items: center;
     }
     .session-card:hover { border-color: #c9a0ff; }
+    .resume-btn {
+      background: #30363d;
+      color: #c9a0ff;
+      border: 1px solid #484f58;
+      border-radius: 6px;
+      padding: 2px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      margin-left: 8px;
+    }
+    .resume-btn:hover { background: #484f58; color: #e1e4e8; }
+    .resume-btn.copied { background: #238636; border-color: #238636; color: #fff; }
     .session-card.active { border-color: #c9a0ff; background: #1c2230; }
     .session-id { font-family: monospace; font-size: 0.85rem; color: #c9a0ff; }
     .session-meta { font-size: 0.8rem; color: #8b949e; }
@@ -706,6 +719,7 @@
                 ${!s.ended_at
                   ? '<span class="badge"><span class="pulse-dot"></span>active</span>'
                   : '<span class="badge">ended</span>'}
+                <button class="resume-btn" onclick="event.stopPropagation(); copyResume('${s.id}', this)">▶ Resume</button>
               </div>
             </div>
           `;
@@ -713,6 +727,17 @@
       } catch (e) {
         console.error('Failed to load sessions:', e);
       }
+    }
+
+    async function copyResume(sessionId, btn) {
+      const cmd = `claude --resume ${sessionId}`;
+      await navigator.clipboard.writeText(cmd);
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = '▶ Resume';
+        btn.classList.remove('copied');
+      }, 1500);
     }
 
     async function selectSession(id) {
