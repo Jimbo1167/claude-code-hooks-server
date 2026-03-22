@@ -729,9 +729,16 @@
       }
     }
 
-    async function copyResume(sessionId, btn) {
+    function copyResume(sessionId, btn) {
       const cmd = `claude --resume ${sessionId}`;
-      await navigator.clipboard.writeText(cmd);
+      const ta = document.createElement('textarea');
+      ta.value = cmd;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
       btn.textContent = 'Copied!';
       btn.classList.add('copied');
       setTimeout(() => {
