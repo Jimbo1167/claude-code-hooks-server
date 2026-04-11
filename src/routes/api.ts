@@ -30,7 +30,7 @@ router.get('/sessions', (req: Request, res: Response) => {
   const sessions = db.prepare(`
     SELECT s.*, COUNT(e.id) as event_count
     FROM sessions s
-    LEFT JOIN hook_events e ON s.id = e.session_id AND e.hook_event_name IN ('PreToolUse', 'PostToolUse')
+    LEFT JOIN hook_events e ON s.id = e.session_id AND e.hook_event_name IN ('PreToolUse', 'PostToolUse', 'PostToolUseFailure')
     ${cwdFilter}
     GROUP BY s.id
     ORDER BY s.started_at DESC
@@ -104,6 +104,30 @@ router.get('/stats', (req: Request, res: Response) => {
     LIMIT 3
   `).all(...cwdParams);
 
+  const failuresToday = db.prepare(`
+    SELECT COUNT(*) as count FROM hook_events e
+    ${cwdJoin}
+    WHERE e.hook_event_name IN ('PostToolUseFailure', 'StopFailure') AND date(e.timestamp) = ? ${cwdFilter}
+  `).get(today, ...cwdParams) as { count: number };
+
+  const failuresAllTime = db.prepare(`
+    SELECT COUNT(*) as count FROM hook_events e
+    ${cwdJoin}
+    WHERE e.hook_event_name IN ('PostToolUseFailure', 'StopFailure') ${cwdFilter}
+  `).get(...cwdParams) as { count: number };
+
+  const permissionDenials = db.prepare(`
+    SELECT COUNT(*) as count FROM hook_events e
+    ${cwdJoin}
+    WHERE e.hook_event_name = 'PermissionDenied' ${cwdFilter}
+  `).get(...cwdParams) as { count: number };
+
+  const subagentsToday = db.prepare(`
+    SELECT COUNT(*) as count FROM hook_events e
+    ${cwdJoin}
+    WHERE e.hook_event_name = 'SubagentStart' AND date(e.timestamp) = ? ${cwdFilter}
+  `).get(today, ...cwdParams) as { count: number };
+
   res.json({
     sessions_today: sessionsToday.count,
     sessions_all_time: sessionsAllTime.count,
@@ -111,6 +135,10 @@ router.get('/stats', (req: Request, res: Response) => {
     tools_all_time: toolsAllTime.count,
     active_sessions: activeSessions.count,
     top_tools: topTools,
+    failures_today: failuresToday.count,
+    failures_all_time: failuresAllTime.count,
+    permission_denials: permissionDenials.count,
+    subagents_today: subagentsToday.count,
   });
 });
 

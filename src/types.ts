@@ -10,6 +10,21 @@ export interface HookEvent {
   stop_hook_reason?: string;
   source?: string;
   last_assistant_message?: string;
+
+  // Notification fields
+  title?: string;
+  message?: string;
+
+  // Subagent fields
+  agent_id?: string;
+  agent_type?: string;
+  agent_transcript_path?: string;
+
+  // Compaction fields
+  transcript_path?: string;
+
+  // Stop hook loop prevention
+  stop_hook_active?: boolean;
 }
 
 export interface Session {

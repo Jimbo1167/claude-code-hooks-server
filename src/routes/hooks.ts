@@ -226,6 +226,201 @@ router.post('/session-end', (req: Request, res: Response) => {
   res.json({});
 });
 
+// --- New hook endpoints ---
+
+router.post('/notification', (req: Request, res: Response) => {
+  const event: HookEvent = req.body;
+  console.log(`[notification] ${event.session_id} - ${event.title || event.message || 'no message'}`);
+
+  const db = getDb();
+  ensureSession(db, event);
+
+  db.prepare(`
+    INSERT INTO hook_events (session_id, hook_event_name, message, source)
+    VALUES (?, 'Notification', ?, ?)
+  `).run(event.session_id, event.message || event.title || null, event.source || null);
+
+  res.json({});
+});
+
+router.post('/post-tool-use-failure', (req: Request, res: Response) => {
+  const event: HookEvent = req.body;
+  console.log(`[post-tool-use-failure] ${event.session_id} - ${event.tool_name}`);
+
+  const db = getDb();
+  ensureSession(db, event);
+
+  const toolResponse = truncate(JSON.stringify(event.tool_response || null), MAX_RESPONSE_SIZE);
+
+  db.prepare(`
+    INSERT INTO hook_events (session_id, hook_event_name, tool_name, tool_input, tool_response)
+    VALUES (?, 'PostToolUseFailure', ?, ?, ?)
+  `).run(event.session_id, event.tool_name || null, JSON.stringify(event.tool_input || null), toolResponse);
+
+  res.json({});
+});
+
+router.post('/stop-failure', (req: Request, res: Response) => {
+  const event: HookEvent = req.body;
+  console.log(`[stop-failure] ${event.session_id}`);
+
+  const db = getDb();
+  ensureSession(db, event);
+
+  db.prepare(`
+    INSERT INTO hook_events (session_id, hook_event_name, message, last_assistant_message)
+    VALUES (?, 'StopFailure', ?, ?)
+  `).run(event.session_id, event.message || null, truncate(event.last_assistant_message || null, MAX_RESPONSE_SIZE));
+
+  res.json({});
+});
+
+router.post('/permission-denied', (req: Request, res: Response) => {
+  const event: HookEvent = req.body;
+  console.log(`[permission-denied] ${event.session_id} - ${event.tool_name}`);
+
+  const db = getDb();
+  ensureSession(db, event);
+
+  db.prepare(`
+    INSERT INTO hook_events (session_id, hook_event_name, tool_name, tool_input)
+    VALUES (?, 'PermissionDenied', ?, ?)
+  `).run(event.session_id, event.tool_name || null, JSON.stringify(event.tool_input || null));
+
+  // Log to audit as a system denial (no rule_id since it came from Claude's classifier)
+  db.prepare(`
+    INSERT INTO permission_audit_log (rule_id, rule_name, session_id, tool_name, tool_input, decision, reason)
+    VALUES (NULL, '[auto-mode classifier]', ?, ?, ?, 'deny', 'Denied by Claude auto-mode classifier')
+  `).run(event.session_id, event.tool_name || null, JSON.stringify(event.tool_input || null));
+
+  res.json({});
+});
+
+router.post('/subagent-start', (req: Request, res: Response) => {
+  const event: HookEvent = req.body;
+  console.log(`[subagent-start] ${event.session_id} - agent:${event.agent_id} type:${event.agent_type}`);
+
+  const db = getDb();
+  ensureSession(db, event);
+
+  db.prepare(`
+    INSERT INTO hook_events (session_id, hook_event_name, agent_id, agent_type, message)
+    VALUES (?, 'SubagentStart', ?, ?, ?)
+  `).run(event.session_id, event.agent_id || null, event.agent_type || null, event.agent_transcript_path || null);
+
+  res.json({});
+});
+
+router.post('/subagent-stop', (req: Request, res: Response) => {
+  const event: HookEvent = req.body;
+  console.log(`[subagent-stop] ${event.session_id} - agent:${event.agent_id} type:${event.agent_type}`);
+
+  const db = getDb();
+  ensureSession(db, event);
+
+  db.prepare(`
+    INSERT INTO hook_events (session_id, hook_event_name, agent_id, agent_type, message)
+    VALUES (?, 'SubagentStop', ?, ?, ?)
+  `).run(event.session_id, event.agent_id || null, event.agent_type || null, event.agent_transcript_path || null);
+
+  res.json({});
+});
+
+router.post('/pre-compact', (req: Request, res: Response) => {
+  const event: HookEvent = req.body;
+  console.log(`[pre-compact] ${event.session_id}`);
+
+  const db = getDb();
+  ensureSession(db, event);
+
+  db.prepare(`
+    INSERT INTO hook_events (session_id, hook_event_name)
+    VALUES (?, 'PreCompact')
+  `).run(event.session_id);
+
+  res.json({});
+});
+
+router.post('/post-compact', (req: Request, res: Response) => {
+  const event: HookEvent = req.body;
+  console.log(`[post-compact] ${event.session_id}`);
+
+  const db = getDb();
+  ensureSession(db, event);
+
+  db.prepare(`
+    INSERT INTO hook_events (session_id, hook_event_name)
+    VALUES (?, 'PostCompact')
+  `).run(event.session_id);
+
+  // Re-inject cross-session context after compaction, same as SessionStart
+  const parts: string[] = [];
+  const cwd = event.cwd;
+
+  if (cwd) {
+    const activeSessions = db.prepare(`
+      SELECT id FROM sessions
+      WHERE cwd = ? AND ended_at IS NULL AND id != ?
+    `).all(cwd, event.session_id) as { id: string }[];
+
+    if (activeSessions.length > 0) {
+      parts.push(`${activeSessions.length} other active session(s) on this project`);
+    }
+
+    const flags = db.prepare(`
+      SELECT flag_type, message, file_path, created_at FROM session_flags
+      WHERE (project_cwd = ? OR project_cwd IS NULL) AND resolved = 0
+      ORDER BY created_at DESC LIMIT 10
+    `).all(cwd) as { flag_type: string; message: string; file_path: string | null; created_at: string }[];
+
+    for (const flag of flags) {
+      const filePart = flag.file_path ? ` (${flag.file_path})` : '';
+      parts.push(`[${flag.flag_type}] ${flag.message}${filePart}`);
+    }
+  }
+
+  if (parts.length > 0) {
+    res.json({
+      hookSpecificOutput: {
+        hookEventName: 'PostCompact',
+        additionalContext: 'CROSS-SESSION CONTEXT (re-injected after compaction):\n' + parts.map(p => `- ${p}`).join('\n'),
+      },
+    });
+  } else {
+    res.json({});
+  }
+});
+
+router.post('/task-created', (req: Request, res: Response) => {
+  const event: HookEvent = req.body;
+  console.log(`[task-created] ${event.session_id}`);
+
+  const db = getDb();
+  ensureSession(db, event);
+
+  db.prepare(`
+    INSERT INTO hook_events (session_id, hook_event_name, tool_input)
+    VALUES (?, 'TaskCreated', ?)
+  `).run(event.session_id, JSON.stringify(event.tool_input || null));
+
+  res.json({});
+});
+
+router.post('/task-completed', (req: Request, res: Response) => {
+  const event: HookEvent = req.body;
+  console.log(`[task-completed] ${event.session_id}`);
+
+  const db = getDb();
+  ensureSession(db, event);
+
+  db.prepare(`
+    INSERT INTO hook_events (session_id, hook_event_name, tool_input)
+    VALUES (?, 'TaskCompleted', ?)
+  `).run(event.session_id, JSON.stringify(event.tool_input || null));
+
+  res.json({});
+});
+
 function ensureSession(db: ReturnType<typeof getDb>, event: HookEvent): void {
   db.prepare(`
     INSERT OR IGNORE INTO sessions (id, permission_mode, model, cwd)

@@ -92,6 +92,9 @@ const MIGRATIONS = [
   `ALTER TABLE hook_events ADD COLUMN tool_response TEXT`,
   `ALTER TABLE hook_events ADD COLUMN source TEXT`,
   `ALTER TABLE hook_events ADD COLUMN last_assistant_message TEXT`,
+  `ALTER TABLE hook_events ADD COLUMN message TEXT`,
+  `ALTER TABLE hook_events ADD COLUMN agent_id TEXT`,
+  `ALTER TABLE hook_events ADD COLUMN agent_type TEXT`,
 ];
 
 function runMigrations(db: Database.Database): void {

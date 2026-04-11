@@ -72,9 +72,19 @@
     .event-type { font-weight: 600; }
     .event-type.PreToolUse { color: #ffa657; }
     .event-type.PostToolUse { color: #7ee787; }
+    .event-type.PostToolUseFailure { color: #f85149; }
     .event-type.SessionStart { color: #79c0ff; }
     .event-type.SessionEnd { color: #f85149; }
     .event-type.Stop { color: #d2a8ff; }
+    .event-type.StopFailure { color: #f47067; }
+    .event-type.Notification { color: #d2a8ff; }
+    .event-type.PermissionDenied { color: #f85149; }
+    .event-type.SubagentStart { color: #a5d6ff; }
+    .event-type.SubagentStop { color: #a5d6ff; }
+    .event-type.PreCompact { color: #ffd700; }
+    .event-type.PostCompact { color: #ffd700; }
+    .event-type.TaskCreated { color: #79c0ff; }
+    .event-type.TaskCompleted { color: #3fb950; }
     .event-detail {
       color: #8b949e;
       font-family: monospace;
@@ -101,7 +111,7 @@
     }
     .stats-bar {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 12px;
       margin-bottom: 24px;
     }
@@ -506,6 +516,18 @@
           <div class="stat-label">Active Now</div>
         </div>
         <div class="stat-card">
+          <div><span class="stat-value" id="stat-failures-today" style="color:#f85149;">-</span><span class="stat-secondary" id="stat-failures-all"></span></div>
+          <div class="stat-label">Failures Today</div>
+        </div>
+        <div class="stat-card">
+          <div><span class="stat-value" id="stat-denials" style="color:#ffa657;">-</span></div>
+          <div class="stat-label">Permission Denials</div>
+        </div>
+        <div class="stat-card">
+          <div><span class="stat-value" id="stat-subagents-today">-</span></div>
+          <div class="stat-label">Subagents Today</div>
+        </div>
+        <div class="stat-card">
           <div class="stat-label">Top Tools</div>
           <div class="top-tools-list" id="stat-top-tools">-</div>
         </div>
@@ -806,8 +828,12 @@
         container.innerHTML = breakdownHtml + events.map((e, i) => {
           const time = new Date(e.timestamp + 'Z').toLocaleTimeString();
           const hasInput = e.tool_input && e.tool_input !== 'null';
+          const hasExpandable = hasInput || e.message;
           let detail = '';
           if (e.tool_name) detail += e.tool_name;
+          if (e.agent_id) detail += (detail ? ' | ' : '') + 'agent:' + e.agent_id;
+          if (e.agent_type) detail += (detail ? ' ' : '') + '(' + e.agent_type + ')';
+          if (e.message) detail += (detail ? ' | ' : '') + e.message.substring(0, 200);
           if (hasInput) {
             try {
               const input = JSON.parse(e.tool_input);
@@ -829,12 +855,18 @@
                   <pre style="margin:0;">${escapeHtml(pretty)}</pre>
                 </div>`;
             } catch {}
+          } else if (e.message && e.message.length > 200) {
+            expandedHtml = `
+              <div class="event-expanded" id="expanded-${i}" style="display:none;">
+                <button class="copy-btn" onclick="copyJson(event, ${i})">Copy</button>
+                <pre style="margin:0;">${escapeHtml(e.message)}</pre>
+              </div>`;
           }
 
           return `
-            <div class="event-row ${hasInput ? 'expandable' : ''}"
-                 ${hasInput ? `onclick="toggleExpand(${i})"` : ''}>
-              <span class="event-time">${hasInput ? '<span class="chevron" id="chev-' + i + '">&#9654;</span>' : ''}${time}</span>
+            <div class="event-row ${hasExpandable ? 'expandable' : ''}"
+                 ${hasExpandable ? `onclick="toggleExpand(${i})"` : ''}>
+              <span class="event-time">${hasExpandable ? '<span class="chevron" id="chev-' + i + '">&#9654;</span>' : ''}${time}</span>
               <span class="event-type ${e.hook_event_name}">${e.hook_event_name}</span>
               <span class="event-detail">${detail || '-'}</span>
             </div>
@@ -856,6 +888,10 @@
         document.getElementById('stat-tools-today').textContent = s.tools_today;
         document.getElementById('stat-tools-all').textContent = `/ ${s.tools_all_time} all time`;
         document.getElementById('stat-active').textContent = s.active_sessions;
+        document.getElementById('stat-failures-today').textContent = s.failures_today ?? 0;
+        document.getElementById('stat-failures-all').textContent = `/ ${s.failures_all_time ?? 0} all time`;
+        document.getElementById('stat-denials').textContent = s.permission_denials ?? 0;
+        document.getElementById('stat-subagents-today').textContent = s.subagents_today ?? 0;
         document.getElementById('stat-top-tools').innerHTML = s.top_tools.length
           ? s.top_tools.map(t => `<span>${t.tool_name}</span> ${t.count}`).join(' &middot; ')
           : 'No data yet';
