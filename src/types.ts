@@ -55,11 +55,12 @@ export interface HookResponse {
     permissionDecision?: 'allow' | 'deny' | 'ask';
     permissionDecisionReason?: string;
     updatedInput?: Record<string, unknown>;
+    updatedPermissions?: Array<{ type: string; mode?: string; tool?: string; destination?: string }>;
     additionalContext?: string;
     decision?: {
       behavior: 'allow' | 'deny';
       message?: string;
-      updatedPermissions?: Array<{ type: string; tool: string }>;
+      updatedPermissions?: Array<{ type: string; mode?: string; tool?: string; destination?: string }>;
     };
   };
   decision?: 'block';
@@ -79,6 +80,7 @@ export interface PermissionRule {
   decision: 'allow' | 'deny' | 'ask';
   reason: string | null;
   updated_input: string | null;
+  updated_permissions: string | null;
   created_at: string;
   hit_count: number;
   last_hit_at: string | null;

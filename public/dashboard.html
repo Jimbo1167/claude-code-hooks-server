@@ -499,6 +499,7 @@
       <div class="tab active" data-tab="sessions" onclick="switchTab('sessions')">Sessions</div>
       <div class="tab" data-tab="rules" onclick="switchTab('rules')">Rules</div>
       <div class="tab" data-tab="flags" onclick="switchTab('flags')">Flags</div>
+      <div class="tab" data-tab="mcp-audit" onclick="switchTab('mcp-audit')">MCP Audit</div>
     </div>
 
     <div id="tab-sessions">
@@ -586,6 +587,8 @@
         </select>
         <label>Reason</label>
         <input type="text" id="rule-reason">
+        <label>Updated Permissions (JSON, e.g. [{"type":"setMode","mode":"acceptEdits","destination":"session"}])</label>
+        <input type="text" id="rule-updated-permissions" placeholder='[{"type":"setMode","mode":"acceptEdits","destination":"session"}]'>
         <label>Priority</label>
         <input type="number" id="rule-priority" value="0">
         <label style="display:flex;align-items:center;gap:8px;">
@@ -667,6 +670,20 @@
         <tbody id="flags-tbody"></tbody>
       </table>
     </div>
+
+    <div id="tab-mcp-audit" style="display:none">
+      <h2>MCP Tool Audit Logs</h2>
+      <p style="font-size:0.8rem;color:#8b949e;margin-bottom:16px;">Raw MCP tool responses saved to disk for auditing. One file per MCP server per day.</p>
+
+      <div class="filter-bar" style="margin-bottom:16px;">
+        <label for="mcp-file-select">Log file:</label>
+        <select id="mcp-file-select" onchange="loadMcpAuditEntries(this.value)">
+          <option value="">Select a file...</option>
+        </select>
+      </div>
+
+      <div id="mcp-audit-entries"></div>
+    </div>
   </div>
 
   <script>
@@ -700,9 +717,11 @@
       document.getElementById('tab-sessions').style.display = tab === 'sessions' ? 'block' : 'none';
       document.getElementById('tab-rules').style.display = tab === 'rules' ? 'block' : 'none';
       document.getElementById('tab-flags').style.display = tab === 'flags' ? 'block' : 'none';
+      document.getElementById('tab-mcp-audit').style.display = tab === 'mcp-audit' ? 'block' : 'none';
 
       if (tab === 'rules') { loadSuggestions(); loadRules(); loadAuditLog(); }
       if (tab === 'flags') { loadFlags(); }
+      if (tab === 'mcp-audit') { loadMcpAuditFiles(); }
     }
 
     // Sessions
@@ -999,6 +1018,7 @@
       document.getElementById('rule-cwd-pattern').value = rule?.session_cwd_pattern || '';
       document.getElementById('rule-decision').value = rule?.decision || 'deny';
       document.getElementById('rule-reason').value = rule?.reason || '';
+      document.getElementById('rule-updated-permissions').value = rule?.updated_permissions || '';
       document.getElementById('rule-priority').value = rule?.priority ?? 0;
       document.getElementById('rule-enabled').checked = rule?.enabled ?? true;
     }
@@ -1018,6 +1038,7 @@
         session_cwd_pattern: document.getElementById('rule-cwd-pattern').value || null,
         decision: document.getElementById('rule-decision').value,
         reason: document.getElementById('rule-reason').value || null,
+        updated_permissions: document.getElementById('rule-updated-permissions').value || null,
         priority: parseInt(document.getElementById('rule-priority').value) || 0,
         enabled: document.getElementById('rule-enabled').checked ? 1 : 0,
       };
@@ -1193,6 +1214,67 @@
       if (!confirm('Delete this flag?')) return;
       await fetch(`/api/flags/${id}`, { method: 'DELETE' });
       loadFlags();
+    }
+
+    // MCP Audit
+    async function loadMcpAuditFiles() {
+      try {
+        const res = await fetch('/api/mcp-audit/files');
+        const files = await res.json();
+        const select = document.getElementById('mcp-file-select');
+        const current = select.value;
+        select.innerHTML = '<option value="">Select a file...</option>' +
+          files.map(f =>
+            `<option value="${escapeHtml(f.filename)}" ${f.filename === current ? 'selected' : ''}>${escapeHtml(f.server)} &middot; ${f.date} (${(f.size_bytes / 1024).toFixed(1)}KB)</option>`
+          ).join('');
+        if (current) loadMcpAuditEntries(current);
+      } catch (e) {
+        console.error('Failed to load MCP audit files:', e);
+      }
+    }
+
+    async function loadMcpAuditEntries(filename) {
+      const container = document.getElementById('mcp-audit-entries');
+      if (!filename) {
+        container.innerHTML = '<div class="empty-state">Select a log file to view entries.</div>';
+        return;
+      }
+      try {
+        const res = await fetch(`/api/mcp-audit/file/${encodeURIComponent(filename)}?limit=200`);
+        const data = await res.json();
+
+        if (!data.entries || data.entries.length === 0) {
+          container.innerHTML = '<div class="empty-state">No entries in this file.</div>';
+          return;
+        }
+
+        container.innerHTML = `<div style="font-size:0.78rem;color:#8b949e;margin-bottom:12px;">${data.total} entries total</div>` +
+          data.entries.map((entry, i) => {
+            const time = new Date(entry.timestamp).toLocaleString();
+            const inputPreview = entry.input ? JSON.stringify(entry.input).substring(0, 150) : '-';
+            const responseStr = JSON.stringify(entry.response, null, 2);
+            const isFailure = entry.hook_event === 'PostToolUseFailure';
+            return `
+              <div class="event-row expandable" onclick="toggleExpand(${1000 + i})" style="grid-template-columns: 140px 100px 120px 1fr;">
+                <span class="event-time"><span class="chevron" id="chev-${1000 + i}">&#9654;</span>${time.split(',').pop().trim()}</span>
+                <span style="color:${isFailure ? '#f85149' : '#a5d6ff'};font-weight:600;font-size:0.8rem;">${escapeHtml(entry.server)}</span>
+                <span style="font-family:monospace;font-size:0.78rem;color:#c9a0ff;">${escapeHtml(entry.tool)}</span>
+                <span class="event-detail">${escapeHtml(inputPreview)}</span>
+              </div>
+              <div class="event-expanded" id="expanded-${1000 + i}" style="display:none;">
+                <button class="copy-btn" onclick="event.stopPropagation(); navigator.clipboard.writeText(document.getElementById('mcpraw-${i}').textContent)">Copy</button>
+                <div style="margin-bottom:8px;"><strong style="color:#c9a0ff;">Session:</strong> <span style="font-family:monospace;">${escapeHtml(entry.session_id)}</span></div>
+                <div style="margin-bottom:8px;"><strong style="color:#ffa657;">Input:</strong></div>
+                <pre style="margin:0 0 12px 0;">${escapeHtml(JSON.stringify(entry.input, null, 2))}</pre>
+                <div style="margin-bottom:8px;"><strong style="color:#7ee787;">Response (raw):</strong></div>
+                <pre style="margin:0;" id="mcpraw-${i}">${escapeHtml(responseStr)}</pre>
+              </div>
+            `;
+          }).join('');
+      } catch (e) {
+        container.innerHTML = '<div class="empty-state">Failed to load audit entries.</div>';
+        console.error('Failed to load MCP audit entries:', e);
+      }
     }
 
     loadSessions();

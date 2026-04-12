@@ -39,7 +39,8 @@ router.post('/rules/suggestions/:key/dismiss', (req: Request, res: Response) => 
 // Create a rule
 router.post('/rules', (req: Request, res: Response) => {
   const { name, description, enabled, priority, tool_name_pattern, command_pattern,
-          file_path_pattern, session_cwd_pattern, decision, reason, updated_input } = req.body;
+          file_path_pattern, session_cwd_pattern, decision, reason, updated_input,
+          updated_permissions } = req.body;
 
   if (!name || !decision) {
     res.status(400).json({ error: 'name and decision are required' });
@@ -53,13 +54,15 @@ router.post('/rules', (req: Request, res: Response) => {
   const db = getDb();
   const result = db.prepare(`
     INSERT INTO permission_rules (name, description, enabled, priority, tool_name_pattern,
-      command_pattern, file_path_pattern, session_cwd_pattern, decision, reason, updated_input)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      command_pattern, file_path_pattern, session_cwd_pattern, decision, reason, updated_input,
+      updated_permissions)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     name, description || null, enabled ?? 1, priority ?? 0,
     tool_name_pattern || null, command_pattern || null,
     file_path_pattern || null, session_cwd_pattern || null,
-    decision, reason || null, updated_input || null
+    decision, reason || null, updated_input || null,
+    updated_permissions || null
   );
 
   const rule = db.prepare('SELECT * FROM permission_rules WHERE id = ?').get(result.lastInsertRowid);
@@ -70,7 +73,8 @@ router.post('/rules', (req: Request, res: Response) => {
 router.put('/rules/:id', (req: Request, res: Response) => {
   const { id } = req.params;
   const { name, description, enabled, priority, tool_name_pattern, command_pattern,
-          file_path_pattern, session_cwd_pattern, decision, reason, updated_input } = req.body;
+          file_path_pattern, session_cwd_pattern, decision, reason, updated_input,
+          updated_permissions } = req.body;
 
   if (decision && !['allow', 'deny', 'ask'].includes(decision)) {
     res.status(400).json({ error: 'decision must be allow, deny, or ask' });
@@ -96,13 +100,15 @@ router.put('/rules/:id', (req: Request, res: Response) => {
       session_cwd_pattern = ?,
       decision = COALESCE(?, decision),
       reason = ?,
-      updated_input = ?
+      updated_input = ?,
+      updated_permissions = ?
     WHERE id = ?
   `).run(
     name || null, description ?? null, enabled ?? null, priority ?? null,
     tool_name_pattern ?? null, command_pattern ?? null,
     file_path_pattern ?? null, session_cwd_pattern ?? null,
-    decision || null, reason ?? null, updated_input ?? null, id
+    decision || null, reason ?? null, updated_input ?? null,
+    updated_permissions ?? null, id
   );
 
   const updated = db.prepare('SELECT * FROM permission_rules WHERE id = ?').get(id);

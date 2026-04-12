@@ -1,5 +1,9 @@
 import { Router, Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { getDb } from '../db/database';
+
+const MCP_AUDIT_DIR = process.env.MCP_AUDIT_DIR || path.join(process.env.DATA_DIR || './data', 'mcp-audit');
 
 const router = Router();
 
@@ -140,6 +144,55 @@ router.get('/stats', (req: Request, res: Response) => {
     permission_denials: permissionDenials.count,
     subagents_today: subagentsToday.count,
   });
+});
+
+// MCP audit log endpoints
+router.get('/mcp-audit/files', (_req: Request, res: Response) => {
+  try {
+    if (!fs.existsSync(MCP_AUDIT_DIR)) {
+      res.json([]);
+      return;
+    }
+    const files = fs.readdirSync(MCP_AUDIT_DIR)
+      .filter(f => f.endsWith('.jsonl'))
+      .sort()
+      .reverse();
+
+    res.json(files.map(f => {
+      const stats = fs.statSync(path.join(MCP_AUDIT_DIR, f));
+      const parts = f.replace('.jsonl', '').split('_');
+      const date = parts.pop();
+      const server = parts.join('_');
+      return { filename: f, server, date, size_bytes: stats.size };
+    }));
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to list audit files' });
+  }
+});
+
+router.get('/mcp-audit/file/:filename', (req: Request, res: Response) => {
+  try {
+    const filename = path.basename(req.params.filename); // prevent path traversal
+    const filePath = path.join(MCP_AUDIT_DIR, filename);
+
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+
+    const lines = fs.readFileSync(filePath, 'utf-8').trim().split('\n');
+    const limit = parseInt(req.query.limit as string) || 100;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const entries = lines
+      .slice(offset, offset + limit)
+      .map(line => { try { return JSON.parse(line); } catch { return null; } })
+      .filter(Boolean);
+
+    res.json({ total: lines.length, offset, limit, entries });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to read audit file' });
+  }
 });
 
 export default router;

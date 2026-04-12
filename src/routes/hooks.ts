@@ -1,9 +1,12 @@
 import { Router, Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { getDb } from '../db/database';
 import { HookEvent } from '../types';
 import { evaluateRules } from '../rules/engine';
 
 const MAX_RESPONSE_SIZE = 10 * 1024; // 10KB
+const MCP_AUDIT_DIR = process.env.MCP_AUDIT_DIR || path.join(process.env.DATA_DIR || './data', 'mcp-audit');
 
 function truncate(str: string | null, max: number): string | null {
   if (!str) return null;
@@ -89,12 +92,18 @@ router.post('/post-tool-use', (req: Request, res: Response) => {
   const db = getDb();
   ensureSession(db, event);
 
-  const toolResponse = truncate(JSON.stringify(event.tool_response || null), MAX_RESPONSE_SIZE);
+  const rawResponse = JSON.stringify(event.tool_response || null);
+  const toolResponse = truncate(rawResponse, MAX_RESPONSE_SIZE);
 
   db.prepare(`
     INSERT INTO hook_events (session_id, hook_event_name, tool_name, tool_input, tool_response)
     VALUES (?, 'PostToolUse', ?, ?, ?)
   `).run(event.session_id, event.tool_name || null, JSON.stringify(event.tool_input || null), toolResponse);
+
+  // Audit MCP tool output: save full raw response to disk
+  if (event.tool_name?.startsWith('mcp__')) {
+    writeMcpAuditLog(event, rawResponse);
+  }
 
   res.json({});
 });
@@ -132,15 +141,26 @@ router.post('/permission-request', (req: Request, res: Response) => {
   const ruleResponse = evaluateRules(event);
   if (ruleResponse.hookSpecificOutput?.permissionDecision) {
     const decision = ruleResponse.hookSpecificOutput.permissionDecision;
-    res.json({
-      hookSpecificOutput: {
-        hookEventName: 'PermissionRequest',
-        decision: {
-          behavior: decision === 'ask' ? 'deny' : decision,
-          message: ruleResponse.hookSpecificOutput.permissionDecisionReason,
-        },
+    const permResponse: Record<string, unknown> = {
+      hookEventName: 'PermissionRequest',
+      decision: {
+        behavior: decision === 'ask' ? 'deny' : decision,
+        message: ruleResponse.hookSpecificOutput.permissionDecisionReason,
       },
-    });
+    };
+
+    // Pass through updatedInput if provided
+    if (ruleResponse.hookSpecificOutput.updatedInput) {
+      permResponse.updatedInput = ruleResponse.hookSpecificOutput.updatedInput;
+    }
+
+    // Pass through updatedPermissions (e.g. setMode to acceptEdits for a session)
+    if (ruleResponse.hookSpecificOutput.updatedPermissions) {
+      (permResponse.decision as Record<string, unknown>).updatedPermissions =
+        ruleResponse.hookSpecificOutput.updatedPermissions;
+    }
+
+    res.json({ hookSpecificOutput: permResponse });
     return;
   }
 
@@ -194,7 +214,7 @@ router.post('/user-prompt-submit', (req: Request, res: Response) => {
 
 router.post('/stop', (req: Request, res: Response) => {
   const event: HookEvent = req.body;
-  console.log(`[stop] ${event.session_id}`);
+  console.log(`[stop] ${event.session_id}${event.stop_hook_active ? ' (stop_hook_active)' : ''}`);
 
   const db = getDb();
   ensureSession(db, event);
@@ -203,6 +223,13 @@ router.post('/stop', (req: Request, res: Response) => {
     INSERT INTO hook_events (session_id, hook_event_name, decision, last_assistant_message)
     VALUES (?, 'Stop', ?, ?)
   `).run(event.session_id, event.stop_hook_reason || null, truncate(event.last_assistant_message || null, MAX_RESPONSE_SIZE));
+
+  // Prevent infinite loop: if stop_hook_active is true, this is a re-entry
+  // from a previous stop hook that returned "block". Always let it through.
+  if (event.stop_hook_active) {
+    res.json({});
+    return;
+  }
 
   res.json({});
 });
@@ -250,12 +277,18 @@ router.post('/post-tool-use-failure', (req: Request, res: Response) => {
   const db = getDb();
   ensureSession(db, event);
 
-  const toolResponse = truncate(JSON.stringify(event.tool_response || null), MAX_RESPONSE_SIZE);
+  const rawResponse = JSON.stringify(event.tool_response || null);
+  const toolResponse = truncate(rawResponse, MAX_RESPONSE_SIZE);
 
   db.prepare(`
     INSERT INTO hook_events (session_id, hook_event_name, tool_name, tool_input, tool_response)
     VALUES (?, 'PostToolUseFailure', ?, ?, ?)
   `).run(event.session_id, event.tool_name || null, JSON.stringify(event.tool_input || null), toolResponse);
+
+  // Audit MCP tool failures too
+  if (event.tool_name?.startsWith('mcp__')) {
+    writeMcpAuditLog(event, rawResponse);
+  }
 
   res.json({});
 });
@@ -420,6 +453,36 @@ router.post('/task-completed', (req: Request, res: Response) => {
 
   res.json({});
 });
+
+function writeMcpAuditLog(event: HookEvent, rawResponse: string): void {
+  try {
+    fs.mkdirSync(MCP_AUDIT_DIR, { recursive: true });
+
+    // Parse MCP tool name: mcp__<server>__<tool>
+    const parts = (event.tool_name || '').split('__');
+    const server = parts[1] || 'unknown';
+    const tool = parts.slice(2).join('__') || 'unknown';
+
+    const entry = {
+      timestamp: new Date().toISOString(),
+      session_id: event.session_id,
+      hook_event: event.hook_event_name,
+      server,
+      tool,
+      tool_name: event.tool_name,
+      input: event.tool_input || null,
+      response: (() => { try { return JSON.parse(rawResponse); } catch { return rawResponse; } })(),
+      cwd: event.cwd || null,
+    };
+
+    // One file per server per day: github_2026-04-11.jsonl
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `${server}_${date}.jsonl`;
+    fs.appendFileSync(path.join(MCP_AUDIT_DIR, filename), JSON.stringify(entry) + '\n');
+  } catch (e) {
+    console.error('[mcp-audit] Failed to write audit log:', e);
+  }
+}
 
 function ensureSession(db: ReturnType<typeof getDb>, event: HookEvent): void {
   db.prepare(`

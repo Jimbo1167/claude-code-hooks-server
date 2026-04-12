@@ -74,6 +74,13 @@ export function evaluateRules(event: HookEvent): HookResponse {
       } catch {}
     }
 
+    // Add updatedPermissions if rule specifies them (e.g. setMode to acceptEdits)
+    if (rule.updated_permissions) {
+      try {
+        response.hookSpecificOutput!.updatedPermissions = JSON.parse(rule.updated_permissions);
+      } catch {}
+    }
+
     return response;
   }
 
