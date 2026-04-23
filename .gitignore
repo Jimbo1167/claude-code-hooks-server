@@ -5,4 +5,5 @@ dist/
 *.db-wal
 .env
 Makefile.local
+.host-role
 docs/investigations/2026-03-05-nanoclaw-agent-sdk-integration.md

@@ -2,6 +2,8 @@
 
 Development and runtime live on different machines. This doc records the exact flow so you don't have to re-derive it each time.
 
+**Which machine is this?** Check `.host-role` at the repo root (gitignored; local to each checkout). `dev` = laptop, `runtime` = home server. See `CLAUDE.md` for what each role is allowed to do.
+
 ## Hosts
 
 | Role | Machine | User | Path |
