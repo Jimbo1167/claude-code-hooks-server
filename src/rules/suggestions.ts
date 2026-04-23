@@ -31,6 +31,15 @@ interface PermissionRuleRow {
   file_path_pattern: string | null;
 }
 
+// Tools that require synchronous user interaction. Auto-allowing them via a
+// PermissionRequest hook short-circuits the prompt and the tool returns an
+// empty result, leaving the assistant with nothing to respond to.
+const INTERACTIVE_TOOLS = new Set([
+  'AskUserQuestion',
+  'ExitPlanMode',
+  'EnterPlanMode',
+]);
+
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -116,7 +125,8 @@ export function generateSuggestions(): Suggestion[] {
     ORDER BY hit_count DESC
   `).all() as AggregatedEvent[];
 
-  const allAgg: AggregatedEvent[] = [...bashAgg, ...fileAgg, ...otherAgg];
+  const allAgg: AggregatedEvent[] = [...bashAgg, ...fileAgg, ...otherAgg]
+    .filter(a => !INTERACTIVE_TOOLS.has(a.tool_name));
 
   // Get existing rules for coverage check
   const existingRules = db.prepare(`
