@@ -4,6 +4,14 @@ import path from 'path';
 import { getDb } from '../db/database';
 import { HookEvent } from '../types';
 import { evaluateRules } from '../rules/engine';
+import { redactValue, isRedactionEnabled } from '../redact';
+
+// Derive a short, human-friendly session title from the working directory.
+function deriveSessionTitle(cwd: string | undefined): string | null {
+  if (!cwd) return null;
+  const base = cwd.split('/').filter(Boolean).pop();
+  return base || null;
+}
 
 const MAX_RESPONSE_SIZE = 10 * 1024; // 10KB
 const MCP_AUDIT_DIR = process.env.MCP_AUDIT_DIR || path.join(process.env.DATA_DIR || './data', 'mcp-audit');
@@ -20,10 +28,11 @@ router.post('/session-start', (req: Request, res: Response) => {
   console.log(`[session-start] ${event.session_id}`);
 
   const db = getDb();
+  const title = deriveSessionTitle(event.cwd);
   db.prepare(`
-    INSERT OR IGNORE INTO sessions (id, permission_mode, model, cwd)
-    VALUES (?, ?, ?, ?)
-  `).run(event.session_id, event.permission_mode || null, event.model || null, event.cwd || null);
+    INSERT OR IGNORE INTO sessions (id, permission_mode, model, cwd, title)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(event.session_id, event.permission_mode || null, event.model || null, event.cwd || null, title);
 
   db.prepare(`
     INSERT INTO hook_events (session_id, hook_event_name, source)
@@ -57,13 +66,16 @@ router.post('/session-start', (req: Request, res: Response) => {
     }
   }
 
+  const hookSpecificOutput: Record<string, unknown> = { hookEventName: 'SessionStart' };
+  if (title) hookSpecificOutput.sessionTitle = title;
   if (parts.length > 0) {
-    res.json({
-      hookSpecificOutput: {
-        hookEventName: 'SessionStart',
-        additionalContext: 'CROSS-SESSION CONTEXT:\n' + parts.map(p => `- ${p}`).join('\n'),
-      },
-    });
+    hookSpecificOutput.additionalContext =
+      'CROSS-SESSION CONTEXT:\n' + parts.map(p => `- ${p}`).join('\n');
+  }
+
+  // Only return structured output if we have something beyond the bare event name.
+  if (Object.keys(hookSpecificOutput).length > 1) {
+    res.json({ hookSpecificOutput });
   } else {
     res.json({});
   }
@@ -92,7 +104,15 @@ router.post('/post-tool-use', (req: Request, res: Response) => {
   const db = getDb();
   ensureSession(db, event);
 
-  const rawResponse = JSON.stringify(event.tool_response || null);
+  // Strip high-confidence secrets out of the tool result before it is persisted
+  // or sent back to Claude. When anything is redacted we return updatedToolOutput
+  // so the model only ever sees the cleaned version.
+  const original = event.tool_response ?? null;
+  const { value: redacted, count } = isRedactionEnabled()
+    ? redactValue(original)
+    : { value: original, count: 0 };
+
+  const rawResponse = JSON.stringify(redacted ?? null);
   const toolResponse = truncate(rawResponse, MAX_RESPONSE_SIZE);
 
   db.prepare(`
@@ -100,9 +120,17 @@ router.post('/post-tool-use', (req: Request, res: Response) => {
     VALUES (?, 'PostToolUse', ?, ?, ?)
   `).run(event.session_id, event.tool_name || null, JSON.stringify(event.tool_input || null), toolResponse);
 
-  // Audit MCP tool output: save full raw response to disk
+  // Audit MCP tool output: save the (redacted) response to disk
   if (event.tool_name?.startsWith('mcp__')) {
     writeMcpAuditLog(event, rawResponse);
+  }
+
+  if (count > 0) {
+    console.log(`[post-tool-use] redacted ${count} secret(s) from ${event.tool_name}`);
+    res.json({
+      hookSpecificOutput: { hookEventName: 'PostToolUse', updatedToolOutput: redacted },
+    });
+    return;
   }
 
   res.json({});
@@ -277,7 +305,12 @@ router.post('/post-tool-use-failure', (req: Request, res: Response) => {
   const db = getDb();
   ensureSession(db, event);
 
-  const rawResponse = JSON.stringify(event.tool_response || null);
+  const original = event.tool_response ?? null;
+  const { value: redacted } = isRedactionEnabled()
+    ? redactValue(original)
+    : { value: original };
+
+  const rawResponse = JSON.stringify(redacted ?? null);
   const toolResponse = truncate(rawResponse, MAX_RESPONSE_SIZE);
 
   db.prepare(`
@@ -450,6 +483,45 @@ router.post('/task-completed', (req: Request, res: Response) => {
     INSERT INTO hook_events (session_id, hook_event_name, tool_input)
     VALUES (?, 'TaskCompleted', ?)
   `).run(event.session_id, JSON.stringify(event.tool_input || null));
+
+  res.json({});
+});
+
+router.post('/cwd-changed', (req: Request, res: Response) => {
+  const event: HookEvent = req.body;
+  const newCwd = event.new_cwd || event.cwd || null;
+  console.log(`[cwd-changed] ${event.session_id} -> ${newCwd}`);
+
+  const db = getDb();
+  ensureSession(db, event);
+
+  // Keep the session's working directory current so dashboard project grouping
+  // doesn't go stale when Claude cd's mid-session.
+  if (newCwd) {
+    db.prepare(`UPDATE sessions SET cwd = ? WHERE id = ?`).run(newCwd, event.session_id);
+  }
+
+  db.prepare(`
+    INSERT INTO hook_events (session_id, hook_event_name, message)
+    VALUES (?, 'CwdChanged', ?)
+  `).run(event.session_id, newCwd);
+
+  res.json({});
+});
+
+router.post('/config-change', (req: Request, res: Response) => {
+  const event: HookEvent = req.body;
+  console.log(`[config-change] ${event.session_id} - ${event.source || 'unknown'} ${event.file_path || ''}`);
+
+  const db = getDb();
+  ensureSession(db, event);
+
+  // source carries the config source (user_settings, project_settings, ...).
+  // file_path is stashed in the message column for visibility on the dashboard.
+  db.prepare(`
+    INSERT INTO hook_events (session_id, hook_event_name, source, message)
+    VALUES (?, 'ConfigChange', ?, ?)
+  `).run(event.session_id, event.source || null, event.file_path || null);
 
   res.json({});
 });

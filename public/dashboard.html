@@ -745,7 +745,7 @@
             <div class="session-card ${s.id === selectedSessionId ? 'active' : ''}"
                  onclick="selectSession('${s.id}')">
               <div>
-                <div class="session-id">${s.id}</div>
+                <div class="session-id">${s.title ? escapeHtml(s.title) + ' · ' : ''}${s.id}</div>
                 <div class="session-meta">
                   <span>${started}</span>
                   <span>${s.cwd || ''}</span>
