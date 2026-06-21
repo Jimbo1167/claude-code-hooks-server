@@ -23,6 +23,15 @@ export interface HookEvent {
   // Compaction fields
   transcript_path?: string;
 
+  // CwdChanged
+  new_cwd?: string;
+
+  // ConfigChange (source carries the config source: user_settings, project_settings, ...)
+  file_path?: string;
+
+  // Reasoning effort delivered on recent hook events ({ level: 'low' | ... })
+  effort?: { level?: string };
+
   // Stop hook loop prevention
   stop_hook_active?: boolean;
 }
@@ -57,6 +66,10 @@ export interface HookResponse {
     updatedInput?: Record<string, unknown>;
     updatedPermissions?: Array<{ type: string; mode?: string; tool?: string; destination?: string }>;
     additionalContext?: string;
+    // PostToolUse: rewrite the tool result before Claude sees it
+    updatedToolOutput?: unknown;
+    // SessionStart: name the session in Claude Code's UI
+    sessionTitle?: string;
     decision?: {
       behavior: 'allow' | 'deny';
       message?: string;
