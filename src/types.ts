@@ -34,6 +34,40 @@ export interface HookEvent {
 
   // Stop hook loop prevention
   stop_hook_active?: boolean;
+
+  // Setup (--init / --maintenance runs)
+  setup_type?: string;
+
+  // UserPromptExpansion
+  command_name?: string;
+  original_prompt?: string;
+
+  // PostToolBatch
+  tool_calls?: Array<Record<string, unknown>>;
+  batch_index?: number;
+
+  // FileChanged (file_path is shared with ConfigChange above)
+  change_type?: string;
+
+  // DirectoryAdded
+  directory_path?: string;
+  add_method?: string;
+
+  // InstructionsLoaded
+  load_reason?: string;
+
+  // WorktreeCreate / WorktreeRemove
+  worktree_path?: string;
+  source_ref?: string;
+  reason?: string;
+
+  // Elicitation / ElicitationResult
+  mcp_server?: string;
+  form_schema?: Record<string, unknown>;
+  user_response?: Record<string, unknown>;
+
+  // TeammateIdle
+  idle_reason?: string;
 }
 
 export interface Session {
@@ -61,7 +95,7 @@ export interface StoredHookEvent {
 export interface HookResponse {
   hookSpecificOutput?: {
     hookEventName: string;
-    permissionDecision?: 'allow' | 'deny' | 'ask';
+    permissionDecision?: 'allow' | 'deny' | 'ask' | 'defer';
     permissionDecisionReason?: string;
     updatedInput?: Record<string, unknown>;
     updatedPermissions?: Array<{ type: string; mode?: string; tool?: string; destination?: string }>;
@@ -70,6 +104,10 @@ export interface HookResponse {
     updatedToolOutput?: unknown;
     // SessionStart: name the session in Claude Code's UI
     sessionTitle?: string;
+    // PermissionDenied: tell the model the denied call may be retried
+    retry?: boolean;
+    // FileChanged: replace the set of watched files going forward
+    watchPaths?: string[];
     decision?: {
       behavior: 'allow' | 'deny';
       message?: string;
@@ -90,7 +128,7 @@ export interface PermissionRule {
   command_pattern: string | null;
   file_path_pattern: string | null;
   session_cwd_pattern: string | null;
-  decision: 'allow' | 'deny' | 'ask';
+  decision: 'allow' | 'deny' | 'ask' | 'defer';
   reason: string | null;
   updated_input: string | null;
   updated_permissions: string | null;

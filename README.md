@@ -93,6 +93,12 @@ care about to your `~/.claude/settings.json`. A minimal example:
   `PermissionRequest`, which need the response to gate the tool call.
 - **Argument filters** — narrow noisy events with `if`, e.g.
   `"if": "Bash(git *)"` or `"if": "Edit(*.ts)"`.
+- **One-shot hooks** — add `"once": true` for events you only need the first
+  time per session (e.g. `InstructionsLoaded` with a `session_start` matcher).
+- **Status text** — `"statusMessage": "Logging to hooks server"` replaces the
+  default spinner text while the request is in flight.
+- **FileChanged matcher** — the hook `matcher` is a literal filename list
+  (`.env|.envrc`), not a regex, and doubles as the watch list.
 
 ## API Endpoints
 
@@ -102,9 +108,9 @@ care about to your `~/.claude/settings.json`. A minimal example:
 |------------|------|-------|
 | SessionStart | `/hooks/session-start` | Injects cross-session context; returns `sessionTitle` |
 | UserPromptSubmit | `/hooks/user-prompt-submit` | Warns about files edited by other active sessions |
-| PreToolUse | `/hooks/pre-tool-use` | Evaluates permission rules (allow/deny/ask) |
+| PreToolUse | `/hooks/pre-tool-use` | Evaluates permission rules (allow/deny/ask/defer) |
 | PermissionRequest | `/hooks/permission-request` | Rule-based auto allow/deny; feeds rule suggestions |
-| PermissionDenied | `/hooks/permission-denied` | Logs auto-mode classifier denials |
+| PermissionDenied | `/hooks/permission-denied` | Logs auto-mode classifier denials; returns `retry: true` when an allow rule matches |
 | PostToolUse | `/hooks/post-tool-use` | Logs result; redacts secrets via `updatedToolOutput` |
 | PostToolUseFailure | `/hooks/post-tool-use-failure` | Logs (redacted) failed tool output |
 | Stop / StopFailure | `/hooks/stop`, `/hooks/stop-failure` | Logs turn end / API-error end |
@@ -115,6 +121,18 @@ care about to your `~/.claude/settings.json`. A minimal example:
 | ConfigChange | `/hooks/config-change` | Logs settings/skills changes |
 | Notification | `/hooks/notification` | Logs notifications |
 | SessionEnd | `/hooks/session-end` | Marks the session ended |
+| Setup | `/hooks/setup` | Logs `--init` / `--maintenance` runs |
+| UserPromptExpansion | `/hooks/user-prompt-expansion` | Logs command expansions (command name + original prompt) |
+| PostToolBatch | `/hooks/post-tool-batch` | Logs a per-batch summary (count + tool names) |
+| FileChanged | `/hooks/file-changed` | Logs watched-file changes; warns Claude to re-read the file |
+| DirectoryAdded | `/hooks/directory-added` | Logs directories added mid-session (`/add-dir`) |
+| InstructionsLoaded | `/hooks/instructions-loaded` | Audit trail of CLAUDE.md / rules files loaded into context |
+| WorktreeCreate / WorktreeRemove | `/hooks/worktree-create`, `/hooks/worktree-remove` | Tracks worktree lifecycle |
+| Elicitation / ElicitationResult | `/hooks/elicitation`, `/hooks/elicitation-result` | Logs MCP user-input requests; responses are secret-redacted |
+| TeammateIdle | `/hooks/teammate-idle` | Logs agent-team teammates going idle |
+
+`MessageDisplay` is deliberately not implemented: it fires per streamed message
+chunk, which would flood the database for no analytical benefit.
 
 ### Dashboard / data API
 
