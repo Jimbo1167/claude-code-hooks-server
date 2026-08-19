@@ -97,6 +97,8 @@ const MIGRATIONS = [
   `ALTER TABLE hook_events ADD COLUMN agent_type TEXT`,
   `ALTER TABLE permission_rules ADD COLUMN updated_permissions TEXT`,
   `ALTER TABLE sessions ADD COLUMN title TEXT`,
+  `ALTER TABLE sessions ADD COLUMN transcript_path TEXT`,
+  `ALTER TABLE sessions ADD COLUMN effort TEXT`,
 ];
 
 function runMigrations(db: Database.Database): void {

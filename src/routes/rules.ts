@@ -46,8 +46,8 @@ router.post('/rules', (req: Request, res: Response) => {
     res.status(400).json({ error: 'name and decision are required' });
     return;
   }
-  if (!['allow', 'deny', 'ask'].includes(decision)) {
-    res.status(400).json({ error: 'decision must be allow, deny, or ask' });
+  if (!['allow', 'deny', 'ask', 'defer'].includes(decision)) {
+    res.status(400).json({ error: 'decision must be allow, deny, ask, or defer' });
     return;
   }
 
@@ -76,8 +76,8 @@ router.put('/rules/:id', (req: Request, res: Response) => {
           file_path_pattern, session_cwd_pattern, decision, reason, updated_input,
           updated_permissions } = req.body;
 
-  if (decision && !['allow', 'deny', 'ask'].includes(decision)) {
-    res.status(400).json({ error: 'decision must be allow, deny, or ask' });
+  if (decision && !['allow', 'deny', 'ask', 'defer'].includes(decision)) {
+    res.status(400).json({ error: 'decision must be allow, deny, ask, or defer' });
     return;
   }
 
