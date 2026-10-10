@@ -12,9 +12,12 @@ import flagsRouter from './routes/flags';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3003', 10);
+// Tool output (e.g. browser/simulator screenshots) routinely exceeds express's
+// 100kb default, which rejected those hook events before they were logged.
+const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '50mb';
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
 // Optional bearer-token auth for the hook transport. When HOOK_AUTH_TOKEN is
 // set, every /hooks/* request must carry `Authorization: Bearer <token>`.

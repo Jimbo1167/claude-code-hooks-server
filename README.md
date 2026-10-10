@@ -29,6 +29,7 @@ DB_PATH=./hooks.db
 DATA_DIR=./data                 # MCP audit logs live under <DATA_DIR>/mcp-audit
 REDACT_TOOL_OUTPUT=true         # strip secrets from tool output (default on)
 HOOK_AUTH_TOKEN=                # if set, /hooks/* requires Bearer <token>
+JSON_BODY_LIMIT=50mb            # max hook request body (tool output can include screenshots)
 ```
 
 ### Secret redaction
